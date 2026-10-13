@@ -1,0 +1,234 @@
+.ro-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30px 36px;
+  background: #e9efdd;
+  border: 1px solid #dce3d2;
+  border-radius: 18px;
+  color: #254635;
+  margin-bottom: 20px;
+}
+.ro-banner h2 {
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -1px;
+  margin: 12px 0;
+}
+.ro-banner p {
+  font-size: 13px;
+}
+.ro-banner svg {
+  margin: 0 35px;
+  transform: rotate(-8deg);
+  opacity: 0.65;
+}
+.ro-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.ro-stats > div {
+  padding: 22px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.ro-stats small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+}
+.ro-stats strong {
+  font-size: 23px;
+  letter-spacing: -0.7px;
+}
+.ro-tabs {
+  overflow: auto;
+  margin-bottom: 24px;
+}
+.ro-partners {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px;
+}
+.ro-party {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.ro-party svg {
+  color: #477258;
+}
+.ro-party small,
+.ro-party span {
+  color: var(--muted);
+}
+.ro-note {
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 22px;
+  max-width: 780px;
+}
+.ro-invoice-parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 22px;
+}
+.ro-invoice-parties small {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+.ro-invoice-parties p {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.ro-invoice-parties h3 {
+  margin: 8px 0;
+}
+.ro-invoice-print {
+  padding-top: 20px;
+}
+.ro-invoice-print table {
+  font-size: 12px;
+}
+.ro-totals {
+  max-width: 280px;
+  margin: 20px 0 20px auto;
+}
+.ro-totals p,
+.ro-totals h3 {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+.ro-totals h3 {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.ro-invoice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  border-top: 1px solid var(--border);
+  padding: 18px 0 4px;
+}
+.ro-lines {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.ro-line {
+  display: grid;
+  grid-template-columns: 2.5fr 1fr 1fr 0.8fr 1fr;
+  gap: 10px;
+  background: #f6f7f2;
+  border-radius: 10px;
+  padding: 16px;
+}
+.ro-line label,
+.ro-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.ro-line input,
+.ro-line select {
+  min-width: 0;
+  width: 100%;
+}
+.ro-exemption {
+  grid-column: 1/-1;
+}
+.ro-timesheets {
+  margin: 24px 0;
+  font-size: 12px;
+}
+.ro-timesheets summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.ro-timesheets .check-field {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.ro-notes {
+  margin-top: 16px;
+}
+.ro-notes textarea {
+  min-height: 70px;
+}
+.ro-response {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+  background: #f7f5ee;
+  padding: 14px;
+}
+.ro-workspace .padded {
+  padding: 28px;
+}
+.ro-workspace .text-button {
+  text-align: left;
+}
+@media (max-width: 750px) {
+  .ro-stats {
+    grid-template-columns: 1fr;
+  }
+  .ro-banner {
+    padding: 24px;
+  }
+  .ro-banner svg {
+    display: none;
+  }
+  .ro-banner h2 {
+    font-size: 26px;
+  }
+  .ro-invoice-parties {
+    grid-template-columns: 1fr;
+  }
+  .ro-line {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ro-line label:first-child {
+    grid-column: 1/-1;
+  }
+}
+@media print {
+  body:has(.ro-invoice-print)
+    *:not(:has(.ro-invoice-print)):not(.ro-invoice-print):not(.ro-invoice-print *) {
+    display: none !important;
+  }
+  body:has(.ro-invoice-print) *:has(.ro-invoice-print) {
+    display: block !important;
+    position: static !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    height: auto !important;
+    width: 100% !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  .ro-invoice-print {
+    font-size: 11pt;
+  }
+}

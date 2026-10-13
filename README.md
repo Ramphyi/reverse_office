@@ -86,7 +86,7 @@ kubectl apply -f deploy/kubernetes.yaml
 kubectl -n reverse-office rollout status deployment/office
 ```
 
-For a local cluster, load `reverse-office:local` into the cluster image store. Do not apply the example secret without replacing it. Set ingress class to your installed controller. WebSocket upgrades must be supported by the ingress. Configure restricted ingress/egress according to the SMTP, AI and TURN services you choose.
+For a local cluster, load `reverse-office:romania` into the cluster image store (`reverse-office:local` on the base branch). Do not apply the example secret without replacing it. Set ingress class to your installed controller. WebSocket upgrades must be supported by the ingress. Configure restricted ingress/egress according to the SMTP, AI and TURN services you choose.
 
 **Keep replicas at one.** SQLite, local files, process-local rate limits and Socket.IO room membership are deliberately a single-instance design. Horizontal scaling requires PostgreSQL, object storage and a shared Socket.IO adapter. A manifest is not proof of a successful deployment on your cluster.
 
@@ -109,6 +109,8 @@ The unit/integration tests use temporary databases and synthetic data. Certifica
 ## Romania branch
 
 The stable workspace is on `main`. The separate `feature/romania-spv` branch is created only after the base checks. It adds customers/suppliers, sales and payable invoices, UBL generation and an ANAF adapter. Live ANAF submission requires enrolled credentials and an organization certificate. No invoices are transmitted merely by starting this application.
+
+**Current checkout: Romania branch.** Open **Billing · RO** for company setup, customer/supplier registers, numbered immutable invoices, approved-time billing and partial payments. See [Romania setup and limitations](docs/ROMANIA.md). All 26 backend tests and 3 browser flows passed; live ANAF acceptance requires registered credentials.
 
 ## Architecture and security
 

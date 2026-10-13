@@ -25,3 +25,7 @@ Screenshots are saved locally in ignored `artifacts/dashboard.png`, `artifacts/m
 External AI model output, external SMTP delivery, production certificate trust/revocation/timestamping, storage disaster recovery and ANAF test/live acceptance require environment-specific credentials and were not claimed as tested. The base branch does not contain billing. The Romania branch records its additional validation separately.
 
 The Vite build currently emits a large-bundle advisory for the combined editor bundle and non-fatal upstream comment annotations. These are recorded warnings, not build failures. Node 22 marks its SQLite module experimental; test coverage and pinned runtime requirements are included.
+
+## Romania branch
+
+After the baseline commit, `feature/romania-spv` passed **26/26 backend tests and 3/3 browser flows**. The `reverse-office:romania` Docker image built and passed authenticated billing writes under non-root/read-only execution. Printing generated `artifacts/invoice.pdf`; desktop/mobile screenshots are `artifacts/billing.png` and `artifacts/billing-mobile.png`. SPV/OAuth tests use an injected simulator and never contact ANAF. See [Romania workflow and evidence](ROMANIA.md).

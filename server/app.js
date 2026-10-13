@@ -770,7 +770,7 @@ export function createApp({
       certificate: !!process.env.PDF_P12_PATH,
       storage: 'Local persistent volume',
       rtc: !!process.env.TURN_URL,
-      spv: false,
+      spv: !!app.locals.romaniaEnabled,
     }),
   );
   app.post('/api/ai', async (req, res) => {
@@ -789,6 +789,7 @@ export function createApp({
         )
         .slice(0, 30)
         .map((x) => visible(req.user, kind, x));
+    if (app.locals.billingContext) context.billing = app.locals.billingContext(req.user);
     if (!process.env.AI_BASE_URL) {
       const tasks = context.tasks,
         docs = context.documents;
@@ -874,16 +875,14 @@ export function createApp({
             ? 413
             : error.status || 500;
       if (status === 500) console.error(error);
-      res
-        .status(status)
-        .json({
-          error:
-            error instanceof z.ZodError
-              ? error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
-              : status === 500
-                ? 'An unexpected server error occurred'
-                : error.message,
-        });
+      res.status(status).json({
+        error:
+          error instanceof z.ZodError
+            ? error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
+            : status === 500
+              ? 'An unexpected server error occurred'
+              : error.message,
+      });
     });
   };
   return { app, store, setupKey, session, readable };

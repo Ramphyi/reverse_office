@@ -41,7 +41,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: office
-          image: reverse-office:local
+          image: reverse-office:romania
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3001

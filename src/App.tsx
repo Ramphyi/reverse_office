@@ -72,6 +72,7 @@ import {
 import { Editor } from './Editors';
 import { Chat, Meetings } from './Collaboration';
 import { Admin, TimeOff, Reports, Timesheets } from './Operations';
+import { Romania } from './Romania';
 
 type ModalConfig = {
   title: string;
@@ -114,6 +115,7 @@ const sections = [
       ['timesheets', 'Timesheets', Clock3],
       ['leave', 'Time off', CalendarDays],
       ['reports', 'Reports', Activity],
+      ['billing', 'Billing · RO', BriefcaseBusiness],
       ['admin', 'Administration', ShieldCheck],
     ],
   },
@@ -132,6 +134,7 @@ const subtitles: Record<string, string> = {
   timesheets: 'Make every hour count.',
   leave: 'A little time away. Everything in balance.',
   reports: 'From approved work to client-ready reports.',
+  billing: 'Invoices, payments and your connection to ANAF.',
   admin: 'Your people. Your workspace. Your control.',
   mail: 'Keep the conversation moving.',
   calendar: 'Make time for what matters.',
@@ -474,7 +477,9 @@ export default function App() {
             <div className="nav-section" key={section.label}>
               <div className="nav-label">{section.label}</div>
               {section.items
-                .filter(([id]) => !['reports', 'admin'].includes(String(id)) || isManager)
+                .filter(
+                  ([id]) => !['reports', 'admin', 'billing'].includes(String(id)) || isManager,
+                )
                 .map(([id, label, Icon]: any) => (
                   <button
                     key={id}
@@ -1109,6 +1114,9 @@ export default function App() {
                   />
                 )}
                 {page === 'reports' && <Reports state={state} notify={notify} />}
+                {page === 'billing' && isManager && (
+                  <Romania user={user} state={state} notify={notify} />
+                )}
                 {page === 'admin' && (
                   <Admin
                     state={state}

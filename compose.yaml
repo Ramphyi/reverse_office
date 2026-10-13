@@ -1,7 +1,7 @@
 services:
   office:
     build: .
-    image: reverse-office:local
+    image: reverse-office:romania
     restart: unless-stopped
     ports:
       - '127.0.0.1:3001:3001'
@@ -23,6 +23,13 @@ services:
       TURN_PASSWORD: ${TURN_PASSWORD:-}
       PDF_P12_PATH: ${PDF_P12_PATH:-}
       PDF_P12_PASSPHRASE: ${PDF_P12_PASSPHRASE:-}
+      ANAF_ENV: ${ANAF_ENV:-test}
+      ANAF_ALLOW_PRODUCTION: ${ANAF_ALLOW_PRODUCTION:-false}
+      ANAF_CLIENT_ID: ${ANAF_CLIENT_ID:-}
+      ANAF_CLIENT_SECRET: ${ANAF_CLIENT_SECRET:-}
+      ANAF_REDIRECT_URI: ${ANAF_REDIRECT_URI:-}
+      SPV_ENCRYPTION_KEY: ${SPV_ENCRYPTION_KEY:-}
+      ANAF_ACCESS_TOKEN: ${ANAF_ACCESS_TOKEN:-}
     volumes:
       - office-data:/app/data
     read_only: true

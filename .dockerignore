@@ -9,3 +9,9 @@ playwright-report
 work
 tools
 *.log
+.env.*
+*.p12
+*.pfx
+*.pem
+backups
+deploy/private-*
