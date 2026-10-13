@@ -1,0 +1,43 @@
+services:
+  office:
+    build: .
+    image: reverse-office:local
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3001:3001'
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3001}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SETUP_KEY: ${SETUP_KEY:?Set a long random SETUP_KEY in .env}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_MODEL: ${AI_MODEL:-qwen2.5:7b}
+      AI_API_KEY: ${AI_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      TURN_URL: ${TURN_URL:-}
+      TURN_USERNAME: ${TURN_USERNAME:-}
+      TURN_PASSWORD: ${TURN_PASSWORD:-}
+      PDF_P12_PATH: ${PDF_P12_PATH:-}
+      PDF_P12_PASSPHRASE: ${PDF_P12_PASSPHRASE:-}
+    volumes:
+      - office-data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1g
+    cpus: 2
+  ollama:
+    image: ollama/ollama:0.11.4
+    profiles: [ai]
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+volumes:
+  office-data:
+  ollama-data:

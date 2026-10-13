@@ -1,0 +1,16 @@
+node_modules/
+dist/
+data/
+.env
+test-results/
+playwright-report/
+*.log
+*.tsbuildinfo
+tools/reverse-skill/
+artifacts/
+backups/
+work/**/tool-index*
+*.p12
+*.pfx
+*.pem
+deploy/private-*
