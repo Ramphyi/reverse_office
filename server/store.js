@@ -24,6 +24,17 @@ export function openStore(dir) {
     CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT,time TEXT NOT NULL,actor TEXT NOT NULL,action TEXT NOT NULL,target TEXT NOT NULL,detail TEXT NOT NULL,previous TEXT NOT NULL,hash TEXT NOT NULL);
     CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT,'Audit is append only'); END;
     CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT,'Audit is append only'); END;`);
+  const columns = db
+    .prepare('PRAGMA table_info(users)')
+    .all()
+    .map((c) => c.name);
+  for (const [name, definition] of Object.entries({
+    must_change_password: 'INTEGER NOT NULL DEFAULT 0',
+    department: "TEXT NOT NULL DEFAULT ''",
+    job_title: "TEXT NOT NULL DEFAULT ''",
+    calendar_id: "TEXT NOT NULL DEFAULT ''",
+  }))
+    if (!columns.includes(name)) db.exec(`ALTER TABLE users ADD COLUMN ${name} ${definition}`);
   const unpack = (row) =>
     row
       ? {
@@ -96,7 +107,11 @@ export function openStore(dir) {
     });
   }
   const users = () =>
-    db.prepare('SELECT id,name,email,role,active,created FROM users ORDER BY name').all();
+    db
+      .prepare(
+        'SELECT id,name,email,role,active,created,must_change_password AS mustChangePassword,department,job_title AS jobTitle,calendar_id AS calendarId FROM users ORDER BY name',
+      )
+      .all();
   function addUser({ name, email, password, role = 'member' }) {
     const id = randomUUID();
     db.prepare('INSERT INTO users(id,name,email,password,role,created) VALUES (?,?,?,?,?,?)').run(

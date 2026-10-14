@@ -6,6 +6,7 @@ import '@fontsource-variable/manrope';
 import './styles.css';
 import './romania.css';
 import './studio.css';
+import './workforce.css';
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

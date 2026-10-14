@@ -1,5 +1,13 @@
 # Executed validation
 
+## Workforce and usability upgrade — 2026-10-14
+
+The base branch passed the production build, **31/31 backend tests, 3/3 workspace browser flows and 3/3 native Office browser flows**. Six new backend tests cover organisation permissions/versioning, atomic onboarding, temporary-password restrictions, password reset/session revocation, cross-year calendars, work/leave conflicts, cancellation, atomic weekly batches and employee data privacy. The new browser flow creates an organisation and employee, replaces the temporary password, changes the profile, approves leave, verifies the same leave in Timesheets, fills a five-day week and checks synchronized totals, dark appearance and 390px layout.
+
+The real spreadsheet engine test selects `A12:D12`, merges it, verifies the XLSX merge element, unmerges it and verifies its removal. A 2×2 clipboard paste is checked through numeric cell values in the exported XLSX. Existing document, presentation, PDF, export and two-account coediting checks also passed. Screenshots: `artifacts/workforce-people.png`, `artifacts/workforce-calendar-dark.png`, `artifacts/workforce-calendar-mobile.png` and `artifacts/sheets-merged-range.png`.
+
+Scope remains representative workflows rather than exhaustive upstream feature verification. Account invitations are shared temporary credentials, not outgoing email; one organisation is supported per deployment. Local browser tests use isolated databases and synthetic accounts.
+
 ## Office Studio upgrade — 2026-10-14
 
 The native engine was tested as the actual `onlyoffice/documentserver:10.0.0` Docker image, with the Node test app on port 3102 and an isolated database. The following checks passed on the base branch:

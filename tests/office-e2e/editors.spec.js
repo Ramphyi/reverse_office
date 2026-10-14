@@ -380,3 +380,79 @@ test('two accounts coedit one native file and preserve both saved contributions'
     await bob.close();
   }
 });
+
+test('spreadsheet range selection, merge, unmerge, rectangular paste and persisted XLSX', async ({
+  page,
+}) => {
+  const needsSetup = (await (await page.request.get('/api/setup')).json()).required;
+  const auth = await page.request.post(needsSetup ? '/api/setup' : '/api/login', {
+    data: {
+      name: 'Office Tester',
+      email: 'office@example.test',
+      password: 'Native-editor-test-42!',
+      key: 'office-browser-test-key',
+    },
+  });
+  expect(auth.ok()).toBeTruthy();
+  const { csrf } = await auth.json();
+  const created = await page.request.post('/api/office/create', {
+    headers: { 'x-csrf-token': csrf },
+    data: { templateId: 'sheet-blank', title: 'Selection and merged cells' },
+  });
+  expect(created.status()).toBe(201);
+  const doc = await created.json();
+  await page.goto('/');
+  await page.locator('nav').getByRole('button', { name: 'Sheets', exact: true }).click();
+  await page.getByRole('button', { name: /^Selection and merged cells/ }).click();
+  await expect(
+    page.locator('.native-editor').getByRole('button', { name: 'Save', exact: true }),
+  ).toBeEnabled({ timeout: 120000 });
+  const editor = page.frames().find((f) => f.url().includes('spreadsheeteditor'));
+  expect(editor).toBeTruthy();
+  const select = async (value) => {
+    await editor.locator('#ce-cell-name').fill(value);
+    await editor.locator('#ce-cell-name').press('Enter');
+  };
+  await select('A12');
+  await page.keyboard.type('Merged heading');
+  await page.keyboard.press('Enter');
+  await select('A12:D12');
+  writeFileSync('artifacts/sheet-range-controls.txt', await editor.locator('body').ariaSnapshot());
+  await editor
+    .getByRole('button', { name: /Merge and center/i })
+    .first()
+    .click();
+  await page.locator('.native-editor').getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.locator('.native-document-name')).toContainText('Saved · version 2');
+  const download = await page.request.get(`/api/documents/${doc.id}/export/xlsx`);
+  const zip = await JSZip.loadAsync(await download.body());
+  const xml = await zip.file('xl/worksheets/sheet1.xml').async('string');
+  expect(xml).toMatch(/<mergeCell ref="A12:D12"/);
+  await page.screenshot({ path: 'artifacts/sheets-merged-range.png', fullPage: true });
+  await select('A12:D12');
+  await editor
+    .getByRole('button', { name: /Merge and center/i })
+    .first()
+    .click();
+  await page.locator('.native-editor').getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.locator('.native-document-name')).toContainText('Saved · version 3');
+  const unmerged = await JSZip.loadAsync(
+    await (await page.request.get(`/api/documents/${doc.id}/export/xlsx`)).body(),
+  );
+  expect(await unmerged.file('xl/worksheets/sheet1.xml').async('string')).not.toContain(
+    '<mergeCell ref="A12:D12"',
+  );
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate(() => navigator.clipboard.writeText('12\t34\n56\t78'));
+  await select('A20');
+  await page.keyboard.press('Control+v');
+  await expect(page.locator('.native-document-name')).toContainText('Editing');
+  await page.locator('.native-editor').getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.locator('.native-document-name')).toContainText('Saved · version 4');
+  const pasted = await JSZip.loadAsync(
+    await (await page.request.get(`/api/documents/${doc.id}/export/xlsx`)).body(),
+  );
+  const pastedXml = await pasted.file('xl/worksheets/sheet1.xml').async('string');
+  expect(pastedXml).toMatch(/<c r="A20"[^>]*>[\s\S]*?<v>12<\/v>/);
+  expect(pastedXml).toMatch(/<c r="B21"[^>]*>[\s\S]*?<v>78<\/v>/);
+});

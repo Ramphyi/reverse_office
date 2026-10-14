@@ -65,7 +65,7 @@ export const schemas = {
       end: date,
       type: z.enum(['Annual', 'Sick', 'Unpaid']),
       reason: z.string().max(1000).default(''),
-      calendarId: z.string().default('default'),
+      calendarId: z.string().max(100).default(''),
       status: z.enum(['Pending', 'Approved', 'Rejected']).default('Pending'),
       userId: z.string().optional(),
     })

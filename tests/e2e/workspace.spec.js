@@ -75,7 +75,7 @@ test('workspace setup, every module, editing, export, administration and persist
   await page.getByLabel('What did you work on?').fill('Browser workflow validation');
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByText('Browser workflow validation')).toBeVisible();
+  await expect(page.getByText('Browser workflow validation').first()).toBeVisible();
   await page.locator('nav').getByRole('button', { name: 'Connect', exact: true }).click();
   await page.getByLabel('Channel message').fill('Hello from the browser test');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -130,6 +130,13 @@ test('two users receive live messages and establish a WebRTC meeting', async ({ 
     const first = await admin.newPage(),
       second = await member.newPage();
     await Promise.all([first.goto('/'), second.goto('/')]);
+    await expect(second.getByRole('heading', { name: 'Set your personal password' })).toBeVisible();
+    await second
+      .getByLabel('Current password', { exact: true })
+      .fill('Browser-member-password-42!');
+    await second.getByLabel('New password', { exact: true }).fill('Browser-personal-password-42!');
+    await second.getByLabel('Confirm new password').fill('Browser-personal-password-42!');
+    await second.getByRole('button', { name: 'Update password', exact: true }).click();
     for (const p of [first, second]) {
       await p.locator('nav').getByRole('button', { name: 'Connect', exact: true }).click();
       await p.getByRole('button', { name: channel.title, exact: true }).click();

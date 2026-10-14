@@ -14,6 +14,7 @@ import { exportDocument } from './exports.js';
 import { safeImport } from './import-safe.js';
 import { seedWorkspace } from './seed.js';
 import { createOfficeEngine } from './office-engine.js';
+import { initWorkforce } from './workforce.js';
 
 const credentials = z.object({
   email: z.string().email().max(200),
@@ -33,6 +34,10 @@ const publicUser = (u) => ({
   email: u.email,
   role: u.role,
   active: u.active,
+  mustChangePassword: !!u.must_change_password,
+  department: u.department || '',
+  jobTitle: u.job_title || '',
+  calendarId: u.calendar_id || '',
 });
 const cookie = (req) =>
   Object.fromEntries((req.headers.cookie ?? '').split(';').map((v) => v.trim().split('=')));
@@ -46,6 +51,7 @@ export function createApp({
     store = openStore(dataDir),
     uploadDir = path.resolve(dataDir, 'files');
   mkdirSync(uploadDir, { recursive: true });
+  const workforce = initWorkforce(store);
   const office = createOfficeEngine({ store, dataDir, ...officeOptions });
   app.locals.office = office;
   const editorOrigin = process.env.OFFICE_PUBLIC_URL
@@ -157,6 +163,11 @@ export function createApp({
       )
         return res.status(403).json({ error: 'Origin is not permitted' });
     }
+    if (user.must_change_password && !['/me', '/password', '/logout'].includes(req.path))
+      return res.status(403).json({
+        error: 'Change your temporary password before accessing the workspace',
+        code: 'PASSWORD_CHANGE_REQUIRED',
+      });
     next();
   });
   app.get('/api/me', (req, res) => res.json({ user: publicUser(req.user), csrf: req.user.csrf }));
@@ -165,20 +176,23 @@ export function createApp({
     res.clearCookie('ro_session', { path: '/' });
     res.json({ ok: true });
   });
-  app.post('/api/password', (req, res) => {
+  app.post('/api/password', loginLimit, (req, res) => {
     const data = z
-      .object({ current: z.string(), password: credentials.shape.password })
+      .object({ current: z.string().max(200), password: credentials.shape.password })
       .parse(req.body);
     if (!verifyPassword(data.current, req.user.password))
       fail(400, 'Current password is incorrect');
+    if (verifyPassword(data.password, req.user.password)) fail(400, 'Choose a different password');
     store.transaction(() => {
       store.db
-        .prepare('UPDATE users SET password=? WHERE id=?')
+        .prepare('UPDATE users SET password=?,must_change_password=0 WHERE id=?')
         .run(hashPassword(data.password), req.user.id);
       store.db.prepare('DELETE FROM sessions WHERE user_id=?').run(req.user.id);
       store.audit(req.user.id, 'password.change', 'account');
     });
-    res.json(signIn(res, req.user));
+    for (const socket of app.locals.io?.sockets.sockets.values() ?? [])
+      if (socket.data.user.id === req.user.id) socket.disconnect(true);
+    res.json(signIn(res, { ...req.user, must_change_password: 0 }));
   });
   const hasProject = (user, id) => {
     const p = store.get('projects', id);
@@ -315,6 +329,7 @@ export function createApp({
       )
         fail(403, 'Only your editable entries can be changed');
       if (kind === 'timesheets') {
+        workforce.checkTime(data, user, old);
         if (!['Draft', 'Submitted'].includes(data.status)) fail(403, 'Use the approval workflow');
         const total =
           store
@@ -329,6 +344,7 @@ export function createApp({
             .reduce((n, t) => n + t.hours, 0) + data.hours;
         if (total > 24) fail(400, 'Daily total cannot exceed 24 hours');
       } else {
+        workforce.checkLeave(data, user, old);
         data.status = 'Pending';
         if (
           store
@@ -350,6 +366,7 @@ export function createApp({
     if (kind === 'documents' && Buffer.byteLength(JSON.stringify(data.content)) > 2000000)
       fail(413, 'Document is too large');
   }
+  workforce.install(app, { validateRefs, credentialLimit: loginLimit });
   app.get('/api/users', (req, res) =>
     res.json(
       store
@@ -363,23 +380,103 @@ export function createApp({
   );
   app.post('/api/users', (req, res) => {
     if (req.user.role !== 'admin') fail(403, 'Administrator access required');
-    const data = account.parse(req.body);
+    const data = account
+      .extend({
+        department: z.string().trim().max(100).default(''),
+        jobTitle: z.string().trim().max(100).default(''),
+        calendarId: z.string().max(100).optional(),
+        mustChangePassword: z.boolean().default(false),
+        projectIds: z.array(z.string()).max(100).default([]),
+        allowance: z.number().min(0).max(366).optional(),
+        allowanceYear: z.number().int().min(2000).max(2200).optional(),
+      })
+      .parse(req.body);
+    if (data.projectIds.some((id) => !store.get('projects', id))) fail(400, 'Unknown project');
+    if (data.calendarId && !store.all('calendars').some((c) => c.calendarId === data.calendarId))
+      fail(400, 'Unknown calendar');
     if (store.users().some((u) => u.email === data.email.toLowerCase()))
       fail(409, 'Email is already registered');
-    const user = store.addUser(data);
-    store.audit(req.user.id, 'account.create', user.id, { role: user.role });
+    const user = store.transaction(() => {
+      const u = store.addUser(data);
+      store.db
+        .prepare(
+          'UPDATE users SET department=?,job_title=?,calendar_id=?,must_change_password=? WHERE id=?',
+        )
+        .run(
+          data.department,
+          data.jobTitle,
+          data.calendarId || '',
+          data.mustChangePassword ? 1 : 0,
+          u.id,
+        );
+      for (const id of data.projectIds) {
+        const p = store.get('projects', id);
+        const { id: _, owner, version, created, updated, ...value } = p;
+        store.put(
+          'projects',
+          { ...value, members: [...p.members, u.id] },
+          req.user.id,
+          id,
+          version,
+        );
+      }
+      if (data.allowance !== undefined)
+        store.put(
+          'entitlements',
+          {
+            userId: u.id,
+            year: data.allowanceYear || new Date().getUTCFullYear(),
+            days: data.allowance,
+            carryLimit: workforce.organisation().carryLimit,
+            calendarId: data.calendarId || workforce.organisation().calendarId,
+          },
+          req.user.id,
+        );
+      store.audit(req.user.id, 'account.create', u.id, { role: u.role });
+      return store.users().find((v) => v.id === u.id);
+    });
     res.status(201).json(user);
   });
   app.patch('/api/users/:id', (req, res) => {
     if (req.user.role !== 'admin') fail(403, 'Administrator access required');
     const data = z
-        .object({ active: z.boolean(), role: z.enum(['admin', 'manager', 'member']) })
+        .object({
+          active: z.boolean(),
+          role: z.enum(['admin', 'manager', 'member']),
+          name: z.string().trim().min(2).max(100).optional(),
+          department: z.string().trim().max(100).optional(),
+          jobTitle: z.string().trim().max(100).optional(),
+          calendarId: z.string().max(100).optional(),
+          projectIds: z.array(z.string()).max(100).optional(),
+        })
         .parse(req.body),
       target = store.users().find((u) => u.id === req.params.id);
     if (!target) fail(404, 'Account not found');
     if (target.id === req.user.id && (!data.active || data.role !== 'admin'))
       fail(400, 'You cannot remove your own administrator access');
+    if (data.projectIds?.some((id) => !store.get('projects', id))) fail(400, 'Unknown project');
+    if (data.calendarId && !store.all('calendars').some((c) => c.calendarId === data.calendarId))
+      fail(400, 'Unknown calendar');
     store.transaction(() => {
+      store.db
+        .prepare('UPDATE users SET name=?,department=?,job_title=?,calendar_id=? WHERE id=?')
+        .run(
+          data.name ?? target.name,
+          data.department ?? target.department,
+          data.jobTitle ?? target.jobTitle,
+          data.calendarId ?? target.calendarId,
+          target.id,
+        );
+      if (data.projectIds)
+        for (const p of store.all('projects')) {
+          const members = [
+            ...p.members.filter((id) => id !== target.id),
+            ...(data.projectIds.includes(p.id) ? [target.id] : []),
+          ];
+          if (JSON.stringify(members) === JSON.stringify(p.members)) continue;
+          const { id, owner, version, created, updated, ...value } = p;
+          store.put('projects', { ...value, members }, req.user.id, id, version);
+        }
       store.db
         .prepare('UPDATE users SET active=?,role=? WHERE id=?')
         .run(data.active ? 1 : 0, data.role, target.id);
@@ -488,6 +585,7 @@ export function createApp({
     if (old.status !== (kind === 'leave' ? 'Pending' : 'Submitted'))
       fail(409, 'Request is not awaiting approval');
     const { status } = z.object({ status: z.enum(['Approved', 'Rejected']) }).parse(req.body);
+    if (status === 'Approved') workforce.checkApproval(kind, old);
     if (kind === 'leave' && status === 'Approved' && old.type === 'Annual')
       for (let y = Number(old.start.slice(0, 4)); y <= Number(old.end.slice(0, 4)); y++) {
         const balance = leaveBalance(

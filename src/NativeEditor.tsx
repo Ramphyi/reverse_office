@@ -335,6 +335,27 @@ export function NativeEditor({
           Powered by ONLYOFFICE Docs
         </span>
       </div>
+      {doc.kind === 'sheet' && (
+        <details className="sheet-help">
+          <summary>Select cells, merge and use spreadsheet tools</summary>
+          <div>
+            <p>
+              <strong>Select a range:</strong> drag across cells, hold Shift while clicking, or
+              enter a range such as A1:D4 in the name box above the grid. Ctrl+A selects the sheet.
+            </p>
+            <p>
+              <strong>Merge:</strong> select adjacent cells → Home → Merge and center (use its arrow
+              for Merge cells, Merge across and Unmerge). Merging keeps the upper-left value; move
+              other values first.
+            </p>
+            <p>
+              <strong>More tools:</strong> Home for number formats, borders and conditional
+              formatting; Insert for images, charts and pivot tables; Data for sorting, filters and
+              validation. Use the full ribbon inside the editor.
+            </p>
+          </div>
+        </details>
+      )}
       {error && (
         <div className="native-error" role="alert">
           <div>
@@ -364,13 +385,6 @@ export function NativeEditor({
       >
         <div id={id} />
       </div>
-      {busy && (
-        <div className="native-saving-shield">
-          <LoaderCircle size={24} className="spin" />
-          <strong>Saving your latest changes�</strong>
-          <span>Keep this window open until saving finishes.</span>
-        </div>
-      )}
       {busy && (
         <div className="native-saving-shield">
           <LoaderCircle size={24} className="spin" />
