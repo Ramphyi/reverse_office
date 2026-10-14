@@ -1,0 +1,15 @@
+services:
+  studio:
+    image: reverse-office:studio
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.studio
+    ports:
+      - '127.0.0.1:3002:8080'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 40
+    mem_limit: 96m
+    restart: unless-stopped

@@ -1,6 +1,12 @@
 # Reverse Office
 
-**Release status: blocked by the requested MIT/Apache-2.0-only license policy.** The current ONLYOFFICE, Node runtime, Debian image and several application dependencies do not meet that policy. The instructions below describe the previous, non-compliant implementation. Docker builds and the deployment script now stop at the license gate. No compliant replacement release has been completed. See [license status and migration blockers](docs/LICENSE-STATUS.md).
+## Working independent editors
+
+**Reverse Studio is available as a separate original-MIT artifact:** `docker compose -p reverse-studio -f compose.studio.yaml up -d --build`, then open **http://localhost:3002**. It provides usable Writer, Sheets and Slides editors, Office exports, local saves and dark mode. Its final `scratch` image contains only original code and browser assets. No login is needed; standalone documents stay in that browser. See [features, limits and deployment](docs/STUDIO.md).
+
+The full company application described below still has unresolved runtime/dependency licenses and a blocked release. The standalone Studio does not imply that accounts, meetings, signing, AI or SPV have been migrated to a compliant distributed backend.
+
+**Full company application release: blocked by the requested MIT/Apache-2.0-only license policy.** The current ONLYOFFICE, Node runtime, Debian image and several application dependencies do not meet that policy. The instructions below describe the previous, non-compliant implementation. Docker builds and the deployment script now stop at the license gate. The complete company suite has not yet been migrated; the standalone Studio above has a separate audited distribution. See [license status and migration blockers](docs/LICENSE-STATUS.md).
 
 A self-hosted company workspace with a consistent modern UI: writing, spreadsheets, presentations, files, PDF signing, chat, meetings, projects, timesheets, leave, company knowledge, mail and an accessible AI sidebar.
 

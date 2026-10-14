@@ -16,6 +16,13 @@ export function plainText(node) {
 }
 const safeAscii = (s) => String(s).replace(/[^\x20-\x7E\n]/g, '?');
 export async function exportDocument(doc, format) {
+  if (doc.content?.studioVersion === 1 && format !== 'json')
+    throw Object.assign(
+      Error(
+        'Open this document in Reverse Studio and use Export to preserve its supported content.',
+      ),
+      { status: 400 },
+    );
   if (format === 'json')
     return { bytes: Buffer.from(JSON.stringify(doc.content, null, 2)), mime: 'application/json' };
   if (format === 'txt')

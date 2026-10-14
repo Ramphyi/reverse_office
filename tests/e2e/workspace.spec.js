@@ -39,21 +39,25 @@ test('workspace setup, every module, editing, export, administration and persist
   }
   await page.locator('nav').getByRole('button', { name: 'Writer', exact: true }).click();
   await page.getByRole('button', { name: 'Create new', exact: true }).click();
-  await page.getByLabel('Name', { exact: true }).fill('Browser test brief');
+  await page.getByRole('button', { name: /Blank document A clean page/ }).click();
+  await page.getByLabel('Document name', { exact: true }).fill('Browser test brief');
   await page.getByRole('button', { name: 'Create & open' }).click();
-  await page.locator('.tiptap').fill('A document written during the browser test.');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Back to workspace' }).click();
+  const studio = page.frameLocator('iframe[title="Reverse Studio document editor"]');
+  await studio
+    .getByRole('textbox', { name: 'Document body' })
+    .fill('A document written during the browser test.');
+  await studio.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(studio.getByText('Saved to workspace', { exact: true })).toBeVisible();
+  await studio.getByRole('button', { name: 'Back to documents' }).click();
   await page.getByRole('button', { name: /^Browser test brief/ }).click();
-  await expect(page.locator('.tiptap')).toContainText(
+  await expect(studio.getByRole('textbox', { name: 'Document body' })).toContainText(
     'A document written during the browser test.',
   );
   const downloadPromise = page.waitForEvent('download');
-  await page.getByLabel('Export document').selectOption('docx');
+  await studio.getByLabel('Export document').selectOption('docx');
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toContain('.docx');
-  await page.getByRole('button', { name: 'Back to workspace' }).click();
+  await studio.getByRole('button', { name: 'Back to documents' }).click();
   await page.locator('nav').getByRole('button', { name: 'Sheets', exact: true }).click();
   await page.getByRole('button', { name: /^Project budget/ }).click();
   await expect(page.getByLabel('Cell D6', { exact: true })).toHaveValue('16320');

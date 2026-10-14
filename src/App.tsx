@@ -72,6 +72,7 @@ import {
 } from './components';
 import { Editor } from './Editors';
 import { NativeEditor } from './NativeEditor';
+import { StudioEditor } from './StudioEditor';
 import { TemplateGallery } from './TemplateGallery';
 import { ThemePicker, useTheme } from './Theme';
 import { Assistant } from './Assistant';
@@ -298,7 +299,7 @@ export default function App() {
     notify('Saved to your workspace');
   };
   const createDocument = (kind: string) => {
-    if (integrations.office && ['doc', 'sheet', 'slides'].includes(kind)) {
+    if (['doc', 'sheet', 'slides'].includes(kind)) {
       setTemplateKind(kind);
       return;
     }
@@ -619,6 +620,15 @@ export default function App() {
             onSaved={refresh}
             onDirtyChange={setDocDirty}
             onAI={() => setAi(true)}
+          />
+        ) : doc?.content?.studioVersion === 1 ? (
+          <StudioEditor
+            key={doc.id}
+            doc={doc}
+            theme={theme}
+            onClose={() => setDoc(null)}
+            onSaved={refresh}
+            onDirtyChange={setDocDirty}
           />
         ) : doc && (integrations.office || doc.office) ? (
           <NativeEditor

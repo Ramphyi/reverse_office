@@ -115,6 +115,7 @@ export const schemas = {
 
 function validContent(kind, content) {
   if (!content || typeof content !== 'object' || Array.isArray(content)) return false;
+  if (content.studioVersion === 1) return validStudioContent(kind, content);
   if (kind === 'sheet')
     return (
       content.cells &&
@@ -170,6 +171,71 @@ function validContent(kind, content) {
     return true;
   };
   return content.type === 'doc' && walk(content, 0);
+}
+
+function validStudioContent(kind, content) {
+  if (kind !== content.kind || !['doc', 'sheet', 'slides'].includes(kind)) return false;
+  if (JSON.stringify(content).length > 3500000) return false;
+  if (kind === 'doc') return typeof content.html === 'string' && content.html.length <= 3400000;
+  const image = (value) =>
+    value === undefined ||
+    value === '' ||
+    (typeof value === 'string' && /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(value));
+  if (kind === 'slides')
+    return (
+      Array.isArray(content.slides) &&
+      content.slides.length > 0 &&
+      content.slides.length <= 100 &&
+      content.slides.every(
+        (s) =>
+          s &&
+          typeof s.title === 'string' &&
+          s.title.length <= 500 &&
+          typeof s.body === 'string' &&
+          s.body.length <= 10000 &&
+          (s.notes === undefined || (typeof s.notes === 'string' && s.notes.length <= 10000)) &&
+          image(s.image),
+      )
+    );
+  const cell = (key) => {
+    const m = /^([A-Z]{1,2})([1-9]\d{0,3})$/.exec(key);
+    return (
+      m &&
+      Number(m[2]) <= 1000 &&
+      [...m[1]].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) <= 100
+    );
+  };
+  const range = (value) =>
+    typeof value === 'string' && value.split(':').length === 2 && value.split(':').every(cell);
+  return (
+    Array.isArray(content.sheets) &&
+    content.sheets.length > 0 &&
+    content.sheets.length <= 20 &&
+    content.sheets.every(
+      (s) =>
+        s &&
+        typeof s.name === 'string' &&
+        s.name.length > 0 &&
+        s.name.length <= 31 &&
+        s.cells &&
+        typeof s.cells === 'object' &&
+        !Array.isArray(s.cells) &&
+        Object.keys(s.cells).length <= 100000 &&
+        Object.entries(s.cells).every(
+          ([k, v]) => cell(k) && typeof v === 'string' && v.length <= 32000,
+        ) &&
+        (!s.styles ||
+          (typeof s.styles === 'object' &&
+            !Array.isArray(s.styles) &&
+            Object.keys(s.styles).every(cell))) &&
+        (!s.merges ||
+          (Array.isArray(s.merges) && s.merges.length <= 10000 && s.merges.every(range))) &&
+        (!s.charts ||
+          (Array.isArray(s.charts) &&
+            s.charts.length <= 10 &&
+            s.charts.every((c) => c && range(c.range) && ['bar', 'line'].includes(c.type)))),
+    )
+  );
 }
 
 export function daysBetween(start, end) {
