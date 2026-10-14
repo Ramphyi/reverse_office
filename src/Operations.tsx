@@ -990,6 +990,13 @@ export function Admin({
           <div className="integration-grid">
             {[
               {
+                name: 'Full Office editors',
+                description: integrations.office
+                  ? 'ONLYOFFICE Docs configured: native documents, spreadsheets, slides and PDFs.'
+                  : 'Start the editors Docker profile and configure the OFFICE_* server settings.',
+                ready: integrations.office,
+              },
+              {
                 name: 'Workspace assistant',
                 description: integrations.ai
                   ? `Connected model: ${integrations.aiModel}`

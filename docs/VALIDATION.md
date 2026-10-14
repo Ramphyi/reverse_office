@@ -1,5 +1,32 @@
 # Executed validation
 
+## Office Studio upgrade — 2026-10-14
+
+The native engine was tested as the actual `onlyoffice/documentserver:10.0.0` Docker image, with the Node test app on port 3102 and an isolated database. The following checks passed on the base branch:
+
+| Check                              | Result                                                                                                         |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Production TypeScript/Vite build   | Pass                                                                                                           |
+| Backend suite                      | 25/25, including eight native-editor/template/AI/security tests                                                |
+| Existing workspace/browser suite   | 2/2, including two-account chat/WebRTC                                                                         |
+| Native Office browser suite        | 2/2 against the real Docker engine                                                                             |
+| Native Writer                      | Immediate typing/save, DOCX contents, PDF rendering, ODT/RTF/TXT exports                                       |
+| Native Sheets                      | Changed C4, D4 recalculated to 1000, chart retained, XLSX/PDF/CSV/ODS exports                                  |
+| Native Slides                      | Added ninth slide, inserted local image, retained chart, PPTX/PDF/ODP exports                                  |
+| Native PDF                         | Opened editing ribbon, inserted image, saved PDF image object, signed edited copy with acknowledgement         |
+| Collaboration                      | Two distinct accounts share one engine session; exported DOCX contains both contributions                      |
+| Appearance                         | Dark editor, dashboard and templates visually inspected; theme survives reload; Ask AI opens beside the editor |
+| Dependency advisory check          | `npm audit --omit=dev`: 0 vulnerabilities                                                                      |
+| Compose and Kubernetes editor YAML | Compose configuration validates; Kubernetes manifest parses/formats                                            |
+
+Save tests exposed and fixed a race caused by forcing a save before the final keystrokes had synchronized. The final implementation waits for the editor event and correlates each completed callback with the requested save. Tests also cover an acknowledgement where the saved bytes have not changed.
+
+The native suite is `npm run test:office`. A manually dispatched CI workflow is provided in `.github/workflows/native-editors.yml`; it has not been claimed as a remotely executed workflow. Screenshots are in ignored `artifacts/native-*.png` and `artifacts/dashboard-dark.png`.
+
+These are representative end-to-end and security checks, not exhaustive verification of every upstream Office feature or every imported Microsoft file. The AI provider contract was tested with a local deterministic provider; a real model is not configured by the tests. Community edition limits, fonts, uncommon file features, live Kubernetes rollout and production certificate/ANAF trust remain environment-specific.
+
+## Original baseline
+
 Baseline verification date: 2026-10-13. Windows host, Node 22.18.0, production Vite build, Chromium through Playwright 1.64.0, Docker Desktop Linux engine 28.3.0.
 
 | Check                                | Result                                                                                       |

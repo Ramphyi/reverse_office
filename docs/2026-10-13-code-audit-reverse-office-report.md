@@ -61,3 +61,13 @@ docker build -t reverse-office:local .
 ```
 
 See [architecture](ARCHITECTURE.md) for the trust-boundary diagram and [validation](VALIDATION.md) for execution status. Synthetic data and signing certificates are created in temporary test directories. No test password is a deployed default.
+
+## Office Studio verification — 2026-10-14
+
+The native editor boundary was reviewed using the existing authorized `code-audit` workflow. Relevant evidence is executable in `tests/office.test.js` and `tests/office-e2e/editors.spec.js`.
+
+Source tickets and save callbacks require valid HMAC JWTs. Current account/project access is checked on source download, editor configuration, native export/history and save acceptance. A revoked account cannot save through an existing editor token. Cache downloads reject foreign origins, non-cache paths and HTTP redirects. OOXML archive parts and declared expansion limits are checked before storage; AI extraction uses a time/memory-bounded worker. The app never sends the shared signing secret to the browser.
+
+Manual testing found and fixed an immediate-save race: a fixed delay could request a save before the final keystrokes reached the document service. The client now waits for the editor synchronization event, requests force-save with a unique identifier, and waits for the callback acknowledgement for that identifier. Editing is blocked during this save. Native files also reject legacy JSON content updates to prevent formatting/image loss.
+
+The Docker build excludes backup directories, certificate files and private deployment secrets. ONLYOFFICE remains an independently maintained, unmodified service with JWT enabled. Its multi-service image does not inherit the workspace container's non-root/read-only profile. Production TLS, network policy, upstream patching, backups, certificate trust and engine licensing require deployment-specific validation.

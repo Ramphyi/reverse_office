@@ -1,0 +1,46 @@
+name: Native Office integration
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  native-editors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Create a disposable document-service secret
+        run: |
+          secret=$(openssl rand -hex 32)
+          echo "::add-mask::$secret"
+          echo "OFFICE_JWT_SECRET=$secret" >> "$GITHUB_ENV"
+      - name: Start the native document engine
+        run: |
+          docker run -d --name native-editor-test -p 127.0.0.1:8082:80 \
+            --add-host host.docker.internal:host-gateway --shm-size 256m \
+            -e JWT_ENABLED=true -e JWT_SECRET="$OFFICE_JWT_SECRET" \
+            -e JWT_HEADER=AuthorizationJwt -e JWT_IN_BODY=true \
+            -e ALLOW_PRIVATE_IP_ADDRESS=true onlyoffice/documentserver:10.0.0
+          for attempt in $(seq 1 90); do
+            if [ "$(curl -fsS http://localhost:8082/healthcheck 2>/dev/null)" = true ]; then exit 0; fi
+            sleep 5
+          done
+          exit 1
+      - run: npm run test:office
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-editor-browser-evidence
+          path: |
+            artifacts/native-*.png
+            artifacts/dashboard-dark.png
+            artifacts/native-test-results
+            artifacts/office-playwright-report
+      - if: always()
+        run: docker rm -f native-editor-test

@@ -49,8 +49,11 @@ export function openStore(dir) {
       'INSERT INTO audit(time,actor,action,target,detail,previous,hash) VALUES (?,?,?,?,?,?,?)',
     ).run(time, actor, action, target, json, previous, hash);
   }
+  let transactionDepth = 0;
   function transaction(fn) {
+    if (transactionDepth) return fn();
     db.exec('BEGIN IMMEDIATE');
+    transactionDepth++;
     try {
       const value = fn();
       db.exec('COMMIT');
@@ -58,6 +61,8 @@ export function openStore(dir) {
     } catch (e) {
       db.exec('ROLLBACK');
       throw e;
+    } finally {
+      transactionDepth--;
     }
   }
   function put(kind, data, owner, id = randomUUID(), version) {

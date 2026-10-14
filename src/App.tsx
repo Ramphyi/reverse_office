@@ -70,6 +70,10 @@ import {
   type Field,
 } from './components';
 import { Editor } from './Editors';
+import { NativeEditor } from './NativeEditor';
+import { TemplateGallery } from './TemplateGallery';
+import { ThemePicker, useTheme } from './Theme';
+import { Assistant } from './Assistant';
 import { Chat, Meetings } from './Collaboration';
 import { Admin, TimeOff, Reports, Timesheets } from './Operations';
 
@@ -138,6 +142,9 @@ const subtitles: Record<string, string> = {
   chat: 'Good things happen when we connect.',
 };
 export default function App() {
+  const { theme, choice, setChoice } = useTheme();
+  const [templateKind, setTemplateKind] = useState<string | null>(null);
+  const [pdfEditing, setPdfEditing] = useState<Item | null>(null);
   const [auth, setAuth] = useState<{ user: User; csrf: string } | null>(null),
     [loading, setLoading] = useState(true),
     [setup, setSetup] = useState(false),
@@ -236,10 +243,17 @@ export default function App() {
     documents = state.documents ?? [],
     tasks = state.tasks ?? [];
   const navigate = (id: string) => {
-    if (doc && docDirty && !confirm('Discard unsaved document changes?')) return;
+    if (
+      (doc || pdfEditing) &&
+      docDirty &&
+      !confirm('Leave this editor? Use Save first to confirm your latest changes are stored.')
+    )
+      return;
+    setPdfEditing(null);
     if (doc) {
       setDoc(null);
     }
+    setDocDirty(false);
     setPage(id);
     setQuery('');
     setMobile(false);
@@ -265,7 +279,11 @@ export default function App() {
     await refresh();
     notify('Saved to your workspace');
   };
-  const createDocument = (kind: string) =>
+  const createDocument = (kind: string) => {
+    if (integrations.office && ['doc', 'sheet', 'slides'].includes(kind)) {
+      setTemplateKind(kind);
+      return;
+    }
     setModal({
       title: `New ${kind === 'doc' ? 'document' : kind === 'sheet' ? 'spreadsheet' : kind === 'slides' ? 'presentation' : 'note'}`,
       fields: [{ key: 'title', label: 'Name', required: true }, projectField],
@@ -286,6 +304,7 @@ export default function App() {
         setDoc(item);
       },
     });
+  };
   const newTask = (initial?: Item) =>
     setModal({
       title: initial ? 'Edit task' : 'Create a task',
@@ -408,6 +427,14 @@ export default function App() {
         (!projectFilter || x.projectId === projectFilter),
     );
   const openDoc = (d: Item) => {
+    if (
+      (doc || pdfEditing) &&
+      docDirty &&
+      !confirm('Leave this editor? Save first to keep your latest changes.')
+    )
+      return;
+    setDocDirty(false);
+    setPdfEditing(null);
     setDoc(d);
     setQuery('');
   };
@@ -553,12 +580,37 @@ export default function App() {
           >
             <CalendarDays size={19} />
           </button>
+          <ThemePicker value={choice} onChange={setChoice} />
           <button className={`assistant-trigger ${ai ? 'active' : ''}`} onClick={() => setAi(!ai)}>
             <Sparkles size={17} /> Ask AI
           </button>
           <span className="avatar small">{initials(user.name)}</span>
         </header>
-        {doc ? (
+        {pdfEditing ? (
+          <NativeEditor
+            key={pdfEditing.id}
+            doc={pdfEditing}
+            collection="files"
+            theme={theme}
+            onClose={() => {
+              setPdfEditing(null);
+              setSelectedPdf(pdfEditing);
+            }}
+            onSaved={refresh}
+            onDirtyChange={setDocDirty}
+            onAI={() => setAi(true)}
+          />
+        ) : doc && (integrations.office || doc.office) ? (
+          <NativeEditor
+            key={doc.id}
+            doc={doc}
+            theme={theme}
+            onClose={() => setDoc(null)}
+            onSaved={refresh}
+            onDirtyChange={setDocDirty}
+            onAI={() => setAi(true)}
+          />
+        ) : doc ? (
           <Editor
             key={doc.id}
             doc={doc}
@@ -1209,10 +1261,25 @@ export default function App() {
           onClose={() => setModal(null)}
         />
       )}
+      {templateKind && (
+        <TemplateGallery
+          kind={templateKind}
+          projects={projects}
+          onClose={() => setTemplateKind(null)}
+          onCreate={async (item) => {
+            await refresh();
+            setDoc(item);
+          }}
+        />
+      )}
       {selectedPdf && (
         <PdfViewer
           file={selectedPdf}
           integrations={integrations}
+          onEdit={() => {
+            setPdfEditing(selectedPdf);
+            setSelectedPdf(null);
+          }}
           onClose={() => setSelectedPdf(null)}
           onSigned={async (f) => {
             await refresh();
@@ -1235,7 +1302,7 @@ export default function App() {
         ref={importRef}
         type="file"
         className="hidden"
-        accept=".docx,.xlsx,.txt,.md"
+        accept=".docx,.xlsx,.pptx,.txt,.md"
         onChange={(e) => {
           if (e.target.files?.[0]) uploadFile(e.target.files[0], true);
           e.target.value = '';
@@ -1790,132 +1857,18 @@ function DocumentTable({
   );
 }
 
-function Assistant({
-  doc,
-  onClose,
-  onOpenDocument,
-}: {
-  doc: Item | null;
-  onClose: () => void;
-  onOpenDocument: (id: string) => void;
-}) {
-  const [prompt, setPrompt] = useState(''),
-    [messages, setMessages] = useState<Item[]>([]),
-    [busy, setBusy] = useState(false);
-  const send = async (text = prompt) => {
-    if (!text.trim() || busy) return;
-    setPrompt('');
-    setMessages((m) => [...m, { role: 'user', text }]);
-    setBusy(true);
-    try {
-      const result = await api('/ai', 'POST', { prompt: text, documentId: doc?.id });
-      setMessages((m) => [...m, { role: 'assistant', ...result }]);
-    } catch (e) {
-      setMessages((m) => [...m, { role: 'assistant', text: (e as Error).message }]);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <aside className="assistant-panel">
-      <header>
-        <div className="assistant-logo">
-          <Sparkles size={19} />
-        </div>
-        <div>
-          <strong>Your assistant</strong>
-          <small>A little help, right here.</small>
-        </div>
-        <button className="icon-button" onClick={onClose} aria-label="Close assistant">
-          <X size={18} />
-        </button>
-      </header>
-      <div className="assistant-context">
-        <span className="online-dot" />
-        {doc ? `Working with: ${doc.title}` : 'Connected to your accessible workspace'}
-      </div>
-      <div className="assistant-messages">
-        {!messages.length && (
-          <div className="assistant-welcome">
-            <div className="assistant-spark">✳</div>
-            <h2>What’s on your mind?</h2>
-            <p>A starting point, a fresh idea, or a little clarity. Let’s find it together.</p>
-            {['Summarize my open tasks', 'Find budget', 'Help me draft a project update'].map(
-              (s) => (
-                <button key={s} onClick={() => send(s)}>
-                  {s}
-                  <ArrowUpRight size={14} />
-                </button>
-              ),
-            )}
-          </div>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className={`ai-message ${m.role}`}>
-            <small>{m.role === 'user' ? 'You' : m.provider || 'Assistant'}</small>
-            <div>{m.text}</div>
-            {m.sources?.length > 0 && (
-              <details>
-                <summary>Workspace references</summary>
-                {m.sources.map((s: Item) => (
-                  <button key={s.id} onClick={() => onOpenDocument(s.id)}>
-                    <FileText size={13} />
-                    {s.title}
-                  </button>
-                ))}
-              </details>
-            )}
-            {m.role === 'assistant' && (
-              <button className="copy-button" onClick={() => navigator.clipboard.writeText(m.text)}>
-                <Copy size={12} /> Copy draft
-              </button>
-            )}
-          </div>
-        ))}
-        {busy && (
-          <div className="assistant-thinking">
-            <LoaderCircle className="spin" size={16} /> Bringing it together…
-          </div>
-        )}
-      </div>
-      <form
-        className="assistant-composer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-      >
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Ask about your work…"
-          aria-label="Message to assistant"
-        />
-        <div>
-          <span>
-            <LockKeyhole size={12} /> Your permissions apply
-          </span>
-          <button disabled={busy || !prompt.trim()} aria-label="Send to assistant">
-            <ArrowRight size={17} />
-          </button>
-        </div>
-      </form>
-      <p className="assistant-disclaimer">
-        Review AI drafts before using them. Actions stay in your hands.
-      </p>
-    </aside>
-  );
-}
 function PdfViewer({
   file,
   integrations,
   onClose,
   onSigned,
+  onEdit,
 }: {
   file: Item;
   integrations: Item;
   onClose: () => void;
   onSigned: (file: Item) => Promise<void>;
+  onEdit: () => void;
 }) {
   const [mode, setMode] = useState('acknowledgement'),
     [reason, setReason] = useState('I have reviewed and acknowledge this document.'),
@@ -1932,6 +1885,18 @@ function PdfViewer({
         <iframe title="PDF preview" src={`/api/files/${file.id}/preview`} />
         <div>
           <h3>Review & sign</h3>
+          {integrations.office && (
+            <button className="button primary" onClick={onEdit}>
+              <FileText size={16} />
+              Edit PDF · full editor
+            </button>
+          )}
+          {integrations.office && (
+            <p className="muted small">
+              Edit text and images, annotate, fill forms and organize pages. Save your changes
+              before returning here to sign.
+            </p>
+          )}
           <label>
             Signature type
             <select value={mode} onChange={(e) => setMode(e.target.value)}>

@@ -15,7 +15,8 @@ export async function api(path: string, method = 'GET', data?: unknown): Promise
     body: data === undefined ? undefined : form ? data : JSON.stringify(data),
   });
   const result = await response.json();
-  if (!response.ok) throw Error(result.error || 'Request failed');
+  if (!response.ok)
+    throw Object.assign(Error(result.error || 'Request failed'), { status: response.status });
   return result;
 }
 export const save = (kind: string, data: Item) =>
