@@ -4,18 +4,18 @@ Original implementation: MIT. No new npm dependencies were added.
 
 ## Where features run
 
-| Feature                                              | Standalone Studio (`:3002`)              | Company application                           |
-| ---------------------------------------------------- | ---------------------------------------- | --------------------------------------------- |
-| Floating launcher, drag, resize, keyboard controls   | Yes                                      | Yes                                           |
-| Search saved Writer/Sheets/Slides content            | Browser-local documents                  | Permission-filtered server documents          |
-| Spreadsheet formulas and calculated ranges           | Yes                                      | Yes                                           |
-| Image preview, paste/drop, camera file capture       | Preview plus optional local vision model | Preview plus optional vision model            |
-| Generative specialist agents and delegation          | Optional local model connector           | OpenAI-compatible endpoint or OpenCode server |
-| Sidebar collapse, resize, reorder and hide shortcuts | Personal Studio shortcut drawer          | Per-account browser preferences               |
+| Feature                                              | Standalone Studio (`:3002`)                | Company application                           |
+| ---------------------------------------------------- | ------------------------------------------ | --------------------------------------------- |
+| Floating launcher, drag, resize, keyboard controls   | Yes                                        | Yes                                           |
+| Search saved Writer/Sheets/Slides content            | Browser-local documents                    | Permission-filtered server documents          |
+| Spreadsheet formulas and calculated ranges           | Yes                                        | Yes                                           |
+| Image preview, paste/drop, camera file capture       | Preview plus optional local vision model   | Preview plus optional vision model            |
+| Generative specialist agents and delegation          | OpenAI through host gateway or local model | OpenAI-compatible endpoint or OpenCode server |
+| Sidebar collapse, resize, reorder and hide shortcuts | Personal Studio shortcut drawer            | Per-account browser preferences               |
 
 The existing full-company distribution remains blocked by `license-policy.json`.
 These changes do not approve its pre-existing dependencies or runtime. The Studio
-scratch container remains original MIT code only. Networking is off until the user configures a model and sends an agent message; its CSP allows only four explicit loopback origins.
+scratch container remains original MIT code only. Network requests require explicit settings/model-list/test actions or sending an agent message; its CSP allows only five explicit loopback origins (four model endpoints and the paired gateway). Settings/model-list/test requests are explicit user actions.
 Browsers, host runtimes, externally configured AI models and OpenCode services are
 not bundled in that container. Their licenses are not certified by this project.
 
@@ -38,14 +38,71 @@ capture is supported by mobile browsers; desktop browsers may offer a file picke
 Images are transmitted to the configured provider only when Send is pressed. The
 company backend independently validates types, signatures, sizes and provider support.
 
-## Standalone model connection
+## Choose a provider and model in Settings
 
-Use Ask AI → Configure local AI. Select one of the fixed loopback endpoints on port
-11434 or 1234 and enter the exact installed model name. The model must implement
-chat completions with tool calls; enable the image option only for a vision model.
-The external server must allow this Studio origin through CORS. The browser supplies
-no cookies or API keys and refuses redirects. Non-loopback endpoints are not supported
-in this edition. Disconnect clears the preference; local tools continue working.
+Company application: **Administration → AI settings**. Administrators can select
+OpenAI, a local model, an existing environment provider, OpenCode, or workspace search
+only. Members can inspect the selection but cannot change it, enumerate models or run
+connection tests. Changes are saved on the server, audited without secrets, and used
+by new agent requests without restarting. Each running request keeps its configuration.
+Open/close the assistant to refresh its provider and vision capability display.
+
+Studio: **Ask AI → AI settings**. Select Local model for an installed Ollama/LM Studio
+server. Load models, choose an exact model ID (or enter one manually), optionally enable
+image support, and save. Direct local connections require the model's CORS settings to
+allow the Studio origin. No model runtime or model weights are bundled.
+
+For OpenAI, start the optional **host** gateway in this repository:
+
+```powershell
+npm run studio:ai
+```
+
+This runs on `127.0.0.1:3210`. Copy the pairing code printed by that command into
+Gateway pairing code, click Connect gateway, select OpenAI, enter an API key, click
+Load models, select a chat/tool-capable model, then Save AI settings. Test connection
+sends a short message and can incur provider charges. The catalog includes model IDs
+available to the account; listing a model does not certify that it supports chat,
+tools or images. Enable image support only for a compatible model.
+
+The gateway source uses Node built-ins only. Node is an external host prerequisite,
+not included in the MIT-only Docker image and not certified MIT/Apache-only in its
+entirety. The full-company Docker image is still blocked by the existing license
+policy. Do not package the gateway runtime into that compliant image without a new
+complete runtime license audit.
+
+The pairing code authorizes this local browser to configure/use the gateway. It is
+stored in sessionStorage; the OpenAI key is not stored in either browser storage area.
+The key input is write-only: blank keeps the saved key, replacement changes it, Remove
+saved API key removes it. Disconnect clears browser configuration/pairing, but does
+not delete the server key: use Remove saved API key first when that is intended.
+The gateway accepts only the two localhost Studio origins on port 3002, exact Host
+headers and a valid pairing code. It is for one trusted local user, not a shared/LAN
+server. Deployments exposed to a network should use the authenticated company backend
+with HTTPS after resolving its distribution license requirements.
+
+Keys are encrypted with AES-256-GCM in `data/studio-ai/ai-settings.json` (company:
+`DATA_DIR/ai-settings.json`). Protect the **entire data directory**, including
+`ai-master.key` and `studio-pairing.key`, with host filesystem permissions. Unix files
+are created with mode 0600; Windows relies on the directory's inherited ACL. Encryption
+does not protect against a person who can read both the ciphertext and master key.
+Back up the master key separately and never commit these files. Missing master keys
+cause startup to fail rather than silently destroying access. Restart the gateway
+after deleting its pairing file to rotate pairing authorization.
+
+OpenAI's endpoint is fixed to `https://api.openai.com/v1`; credentials never go to a
+local model endpoint. Local endpoint settings accept only loopback HTTP `/v1` URLs.
+Redirects are refused. Model responses are bounded to 2 MB and outbound calls to 60s.
+The Studio gateway rejects agent runs when their saved settings revision is stale;
+reconnect in settings after changing providers elsewhere.
+
+Official protocol references: [server-side API key authentication](https://developers.openai.com/api/reference/overview),
+[model listing](https://developers.openai.com/api/reference/resources/models/methods/list),
+[chat completions and tool calls](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
+OpenAI requests use `max_completion_tokens`, omit optional sampling settings for broad
+model compatibility, and explicitly set `store: false`. Local compatible endpoints
+continue using `max_tokens`. Tests use provider fixtures; a live provider requires the
+user's real key or installed local model.
 
 Seven specialist roles and the same four tool types are implemented in original
 browser JavaScript. They operate only on this browser's documents, including a snapshot

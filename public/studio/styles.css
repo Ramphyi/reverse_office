@@ -1494,3 +1494,24 @@ textarea {
     max-width: 100%;
   }
 }
+
+.studio-model-settings {
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  width: min(560px, calc(100vw - 32px));
+}
+.studio-model-settings form {
+  display: grid;
+  gap: 12px;
+}
+.studio-model-settings [hidden] {
+  display: none !important;
+}
+.studio-model-settings small {
+  opacity: 0.72;
+  line-height: 1.5;
+}
+.studio-model-settings [role='status'] {
+  color: var(--accent);
+  white-space: pre-wrap;
+}

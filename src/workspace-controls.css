@@ -372,3 +372,26 @@
     display: none !important;
   }
 }
+
+.ai-settings-card fieldset {
+  display: grid;
+  gap: 16px;
+}
+.ai-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.ai-settings-card input[type='checkbox'] {
+  width: auto;
+}
+
+.ai-settings-card label.ai-vision {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ai-settings-card .ai-vision input {
+  margin: 0;
+}

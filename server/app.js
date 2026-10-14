@@ -1,3 +1,4 @@
+import { createAISettings, installAISettings } from './ai-settings.js';
 import express from 'express';
 import { installAssistant } from './assistant.js';
 import helmet from 'helmet';
@@ -53,6 +54,7 @@ export function createApp({
     uploadDir = path.resolve(dataDir, 'files');
   mkdirSync(uploadDir, { recursive: true });
   const workforce = initWorkforce(store);
+  const aiSettings = createAISettings(dataDir);
   const office = createOfficeEngine({ store, dataDir, ...officeOptions });
   app.locals.office = office;
   const editorOrigin = process.env.OFFICE_PUBLIC_URL
@@ -902,8 +904,8 @@ export function createApp({
   });
   app.get('/api/integrations', (req, res) =>
     res.json({
-      ai: !!(process.env.AI_BASE_URL || process.env.OPENCODE_BASE_URL),
-      aiModel: process.env.AI_MODEL || '',
+      ai: aiSettings.current().provider !== 'disabled',
+      aiModel: aiSettings.publicConfig().model,
       smtp: !!process.env.SMTP_HOST,
       certificate: !!process.env.PDF_P12_PATH,
       storage: 'Local persistent volume',
@@ -912,7 +914,8 @@ export function createApp({
       office: office.enabled,
     }),
   );
-  installAssistant(app, { store, readable, visible, office, safeImport, fail });
+  installAISettings(app, aiSettings, store);
+  installAssistant(app, { store, readable, visible, office, safeImport, fail, aiSettings });
   app.get('/api/rtc-config', (req, res) =>
     res.json({
       iceServers: process.env.TURN_URL

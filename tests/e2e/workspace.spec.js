@@ -243,3 +243,31 @@ uiTest(
     uiExpect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
   },
 );
+
+test('administrators choose the AI provider and model from settings', async ({ page }) => {
+  await page.request.post('/api/login', {
+    data: { email: 'alex@example.test', password: 'Browser-test-password-42!' },
+  });
+  await page.goto('/');
+  await page
+    .getByRole('navigation', { name: 'Workspace navigation' })
+    .getByRole('button', { name: 'Administration', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'AI settings', exact: true }).click();
+  await page.getByLabel('AI provider').selectOption('local');
+  await page.getByLabel('Local model endpoint').fill('http://127.0.0.1:11434/v1');
+  await page.getByLabel('AI model', { exact: true }).fill('browser-selected-model');
+  await page.getByRole('button', { name: 'Save AI settings', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('AI settings saved');
+  await page.reload();
+  await page
+    .getByRole('navigation', { name: 'Workspace navigation' })
+    .getByRole('button', { name: 'Administration', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'AI settings', exact: true }).click();
+  await expect(page.getByLabel('AI model', { exact: true })).toHaveValue('browser-selected-model');
+  await page.screenshot({ path: 'artifacts/company-ai-settings.png', animations: 'disabled' });
+  await page.getByLabel('AI provider').selectOption('disabled');
+  await page.getByRole('button', { name: 'Save AI settings', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('AI settings saved');
+});

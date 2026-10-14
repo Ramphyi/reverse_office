@@ -19,7 +19,8 @@
     "license:report": "node scripts/license-audit.mjs",
     "license:check": "node scripts/license-audit.mjs --check",
     "test:studio": "playwright test --config playwright.studio.config.js",
-    "studio:dev": "node scripts/studio-dev.mjs"
+    "studio:dev": "node scripts/studio-dev.mjs",
+    "studio:ai": "node scripts/studio-ai-gateway.mjs"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",

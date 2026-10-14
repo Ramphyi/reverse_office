@@ -268,3 +268,31 @@ test('current OpenCode API uses confirmed deny rules, waits for completion and r
   await assert.rejects(openCodeCompletion([], [], AbortSignal.timeout(10000)), /did not confirm/);
   delete process.env.OPENCODE_BASE_URL;
 });
+
+test('organisation AI settings require admin and CSRF and drive the selected model', async () => {
+  const config = {
+    provider: 'local',
+    baseUrl: providerBase + '/v1',
+    model: 'chosen-fixture',
+    revision: 0,
+    vision: false,
+  };
+  assert.equal((await request('/ai/settings', config, outsider)).status, 403);
+  assert.equal((await request('/ai/models', config, outsider)).status, 403);
+  const noCsrf = await fetch(base + '/api/ai/settings', {
+    method: 'POST',
+    headers: { Cookie: auth.cookie, 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  assert.equal(noCsrf.status, 403);
+  const saved = await request('/ai/settings', config);
+  assert.equal(saved.status, 200);
+  assert.equal(saved.data.apiKey, undefined);
+  assert.equal((await request('/ai/settings', null, outsider)).data.model, 'chosen-fixture');
+  seen.length = 0;
+  responder = async () => response({ content: 'Selected model reply' });
+  const result = await request('/ai', { prompt: 'Say hello' });
+  assert.equal(result.status, 200);
+  assert.equal(seen[0].body.model, 'chosen-fixture');
+  assert.equal((await request('/ai/settings', config)).status, 409);
+});

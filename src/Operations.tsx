@@ -1,3 +1,4 @@
+import { AISettings } from './AISettings';
 import { WorkCalendar } from './WorkCalendar';
 import { People } from './People';
 import { Organisation } from './Organisation';
@@ -757,6 +758,7 @@ export function Admin({
         {[
           { id: 'people', name: 'People', Icon: Users },
           { id: 'organisation', name: 'Organisation', Icon: Settings2 },
+          { id: 'ai', name: 'AI settings', Icon: Settings2 },
           { id: 'calendars', name: 'Calendars', Icon: CalendarDays },
           { id: 'entitlements', name: 'Leave allowances', Icon: Clock3 },
           ...(user.role === 'admin' ? [{ id: 'audit', name: 'Audit log', Icon: ShieldCheck }] : []),
@@ -774,6 +776,7 @@ export function Admin({
       {tab === 'organisation' && (
         <Organisation state={state} user={user} users={users} refresh={refresh} notify={notify} />
       )}
+      {tab === 'ai' && <AISettings admin={user.role === 'admin'} />}
       {tab === 'calendars' && (
         <>
           <div className="section-bar">

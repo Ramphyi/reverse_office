@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Reverse Office contributors
 import { bindFloating, prepareImage } from './floating.js';
 import { searchDocuments, readSheet } from './search.js';
-import { AGENTS, LOCAL_PROVIDERS, runLocalAgent } from './agent.js';
+import { AGENTS, LOCAL_PROVIDERS, runLocalAgent, GATEWAY, aiRequest } from './agent.js';
 
 // Model connections are opt-in and restricted to explicitly allowed loopback origins.
 export function mountAssistant({ getDocuments, getCurrent, onOpen }) {
@@ -46,7 +46,7 @@ export function mountAssistant({ getDocuments, getCurrent, onOpen }) {
   );
   const intro = node(
     'p',
-    'Search runs locally. Connect your local model to use specialist agents and optional image analysis.',
+    'Search runs locally. Choose OpenAI or a local model in AI settings for specialist agents and image analysis.',
     'studio-ai-note',
   );
   const options = node('div', '', 'studio-ai-options'),
@@ -68,7 +68,8 @@ export function mountAssistant({ getDocuments, getCurrent, onOpen }) {
   const conversation = [];
   try {
     const saved = JSON.parse(localStorage.getItem('reverse-studio-model'));
-    if (saved && LOCAL_PROVIDERS.includes(saved.url)) connection = saved;
+    if (saved && (LOCAL_PROVIDERS.includes(saved.url) || (saved.gateway && saved.url === GATEWAY)))
+      connection = saved;
   } catch {}
   const status = node('small');
   const showStatus = () => {
@@ -78,11 +79,22 @@ export function mountAssistant({ getDocuments, getCurrent, onOpen }) {
   function settings() {
     const dialog = node('dialog', '', 'studio-model-settings'),
       form = node('form');
-    const title = node('h2', 'Connect a local model'),
+    const title = node('h2', 'AI settings'),
       description = node(
         'p',
-        'Agents send your question, relevant browser documents and attached images to this local endpoint when you press Send. No API keys are stored. Enable CORS for this site in your model server.',
+        'Choose the model used by all your agents. OpenAI receives requested document context and images when you send a message. Local models run on your computer.',
       );
+    const provider = node('select');
+    provider.setAttribute('aria-label', 'AI provider');
+    for (const [value, label] of [
+      ['local', 'Local model · Ollama / LM Studio'],
+      ['openai', 'OpenAI'],
+    ]) {
+      const option = node('option', label);
+      option.value = value;
+      provider.append(option);
+    }
+    provider.value = connection?.provider === 'openai' ? 'openai' : 'local';
     const host = node('select');
     host.setAttribute('aria-label', 'Local model endpoint');
     for (const url of LOCAL_PROVIDERS) {
@@ -90,36 +102,214 @@ export function mountAssistant({ getDocuments, getCurrent, onOpen }) {
       option.value = url;
       host.append(option);
     }
-    host.value = connection?.url || LOCAL_PROVIDERS[0];
+    host.value = LOCAL_PROVIDERS.includes(connection?.url) ? connection.url : LOCAL_PROVIDERS[0];
+    const secure = node('input');
+    secure.type = 'checkbox';
+    secure.checked = !!connection?.gateway;
+    const secureLabel = node('label', 'Use secure local gateway');
+    secureLabel.prepend(secure);
+    const pairing = node('input');
+    pairing.type = 'password';
+    pairing.autocomplete = 'off';
+    pairing.setAttribute('aria-label', 'Gateway pairing code');
+    pairing.placeholder = 'Pairing code from npm run studio:ai';
+    pairing.value = sessionStorage.getItem('reverse-studio-pairing') || '';
+    const pairingLabel = node('label', 'Gateway pairing code'),
+      keyLabel = node('label', 'OpenAI API key');
+    const key = node('input');
+    key.type = 'password';
+    key.autocomplete = 'new-password';
+    key.setAttribute('aria-label', 'OpenAI API key');
+    key.placeholder = 'Saved on server · leave blank to keep';
     const model = node('input');
     model.setAttribute('aria-label', 'Local model name');
-    model.placeholder = 'Exact installed model name';
-    model.required = true;
+    model.placeholder = 'Choose or enter an exact model ID';
     model.maxLength = 120;
     model.value = connection?.model || '';
+    const list = node('datalist');
+    list.id = 'studio-ai-models';
+    model.setAttribute('list', list.id);
     const vision = node('input');
     vision.type = 'checkbox';
     vision.checked = !!connection?.vision;
     const visionLabel = node('label', 'This model supports images');
     visionLabel.prepend(vision);
+    const message = node('p');
+    message.setAttribute('role', 'status');
+    const note = node(
+      'small',
+      'The gateway keeps your API key on this computer. Start it with npm run studio:ai. Test connection sends a short message and may incur provider charges.',
+    );
+    const removeKey = button('Remove saved API key', 'Remove saved API key', () =>
+      action('remove'),
+    );
     const save = node('button', 'Use local model');
     save.type = 'submit';
     const close = () => {
+      key.value = '';
       dialog.close();
       dialog.remove();
+    };
+    let revision = connection?.revision || 0,
+      loaded = false,
+      busy = false;
+    const usesGateway = () => provider.value === 'openai' || secure.checked;
+    function render() {
+      removeKey.hidden = provider.value !== 'openai';
+      host.hidden = provider.value !== 'local';
+      key.hidden = provider.value !== 'openai';
+      keyLabel.hidden = key.hidden;
+      pairingLabel.hidden = !usesGateway();
+      secureLabel.hidden = provider.value === 'openai';
+      pairing.hidden = !usesGateway();
+      note.hidden = !usesGateway();
+      save.textContent = usesGateway() ? 'Save AI settings' : 'Use local model';
+      model.setAttribute(
+        'aria-label',
+        provider.value === 'openai' ? 'AI model' : 'Local model name',
+      );
+    }
+    const draft = () => ({
+      provider: provider.value,
+      baseUrl: host.value,
+      model: model.value.trim(),
+      vision: vision.checked,
+      apiKey: key.value || undefined,
+      revision,
+    });
+    async function gateway(path, body) {
+      return aiRequest(GATEWAY + path, body, undefined, pairing.value.trim());
+    }
+    async function load() {
+      const config = await gateway('/settings', {});
+      revision = config.revision;
+      loaded = true;
+      return config;
+    }
+    async function action(kind) {
+      if (busy) return;
+      busy = true;
+      save.disabled = true;
+      message.textContent = 'Connecting…';
+      try {
+        if (usesGateway() && !loaded) await load();
+        if (kind === 'models') {
+          const result = usesGateway()
+            ? await gateway('/models', draft())
+            : await aiRequest(host.value + '/models');
+          const models = result.models || (result.data || []).map((m) => m.id);
+          list.replaceChildren();
+          for (const id of models.slice(0, 1000)) {
+            if (typeof id !== 'string') continue;
+            const option = node('option');
+            option.value = id;
+            list.append(option);
+          }
+          message.textContent =
+            models.length + ' models loaded. Choose a model that supports chat and tools.';
+        } else if (kind === 'test') {
+          if (!model.value.trim()) throw Error('Choose a model first');
+          if (usesGateway()) await gateway('/test', draft());
+          else {
+            const result = await aiRequest(host.value + '/chat/completions', {
+              model: model.value.trim(),
+              messages: [{ role: 'user', content: 'Reply with OK.' }],
+              max_tokens: 20,
+            });
+            if (!result.choices?.[0]?.message) throw Error('Model did not return a chat response');
+          }
+          message.textContent = 'Connection successful: ' + model.value;
+        } else {
+          if (!model.value.trim() && kind !== 'remove') throw Error('Choose a model first');
+          if (usesGateway()) {
+            const config = await gateway('/save', { ...draft(), removeKey: kind === 'remove' });
+            revision = config.revision;
+            sessionStorage.setItem('reverse-studio-pairing', pairing.value.trim());
+            connection = {
+              url: GATEWAY,
+              gateway: true,
+              provider: config.provider,
+              model: config.model,
+              vision: config.vision,
+              revision,
+            };
+          } else
+            connection = {
+              url: host.value,
+              provider: 'local',
+              model: model.value.trim(),
+              vision: vision.checked,
+            };
+          key.value = '';
+          localStorage.setItem('reverse-studio-model', JSON.stringify(connection));
+          showStatus();
+          select.value = 'agent:coordinator';
+          submit.textContent = 'Send ↑';
+          if (kind === 'remove') message.textContent = 'API key removed from gateway.';
+          else close();
+        }
+      } catch (error) {
+        message.textContent = error.message;
+      } finally {
+        busy = false;
+        save.disabled = false;
+      }
+    }
+    provider.onchange = () => {
+      model.value = '';
+      list.replaceChildren();
+      key.value = '';
+      vision.checked = false;
+      render();
+    };
+    secure.onchange = render;
+    pairing.oninput = () => {
+      loaded = false;
     };
     form.append(
       title,
       description,
-      node('label', 'Endpoint'),
+      node('label', 'Provider'),
+      provider,
       host,
+      secureLabel,
+      pairingLabel,
+      pairing,
+      button('Connect gateway', 'Connect gateway', async () => {
+        try {
+          const config = await load();
+          sessionStorage.setItem('reverse-studio-pairing', pairing.value.trim());
+          if (['local', 'openai'].includes(config.provider)) {
+            provider.value = config.provider;
+            model.value = config.model;
+            vision.checked = config.vision;
+            if (LOCAL_PROVIDERS.includes(config.baseUrl)) host.value = config.baseUrl;
+          }
+          secure.checked = true;
+          render();
+          message.textContent = config.hasKey
+            ? 'Connected · API key saved on server'
+            : 'Connected · no API key saved';
+        } catch (error) {
+          message.textContent = error.message;
+        }
+      }),
+      keyLabel,
+      key,
       node('label', 'Model'),
       model,
+      list,
       visionLabel,
+      button('Load models', 'Load models', () => action('models')),
+      button('Test connection', 'Test connection', () => action('test')),
+      note,
+      message,
       save,
+      removeKey,
       button('Disconnect', 'Disconnect local model', () => {
         connection = null;
         localStorage.removeItem('reverse-studio-model');
+        sessionStorage.removeItem('reverse-studio-pairing');
         showStatus();
         close();
       }),
@@ -127,21 +317,15 @@ export function mountAssistant({ getDocuments, getCurrent, onOpen }) {
     );
     form.onsubmit = (e) => {
       e.preventDefault();
-      connection = { url: host.value, model: model.value.trim(), vision: vision.checked };
-      try {
-        localStorage.setItem('reverse-studio-model', JSON.stringify(connection));
-      } catch {}
-      showStatus();
-      select.value = 'agent:coordinator';
-      submit.textContent = 'Send ↑';
-      close();
+      action('save');
     };
     dialog.append(form);
     document.body.append(dialog);
-    dialog.addEventListener('cancel', () => dialog.remove());
+    dialog.addEventListener('cancel', close);
+    render();
     dialog.showModal();
   }
-  options.append(button('⚙', 'Configure local AI', settings), status);
+  options.append(button('⚙ AI settings', 'Configure local AI', settings), status);
   const messages = node('div', '', 'studio-ai-messages');
   messages.setAttribute('aria-live', 'polite');
   const welcome = node('div', '', 'studio-ai-welcome');

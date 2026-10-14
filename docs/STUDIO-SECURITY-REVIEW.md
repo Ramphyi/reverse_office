@@ -39,3 +39,24 @@ without prompt or image bodies. No live third-party AI credentials were used in 
 The standalone browser suite exercises persisted rich-text editing, table insertion, merges, relative fills, charts, native Office packages, embedded images, printing content, compressed import, original retention, rectangular clipboard, dark mode, and stale-tab conflicts. XLSX output is parsed with ExcelJS independently from the original serializer. The container checks verify exact source/served hashes, CSP, HEAD behavior, method/path rejection, concurrent requests and oversized header handling.
 
 This is a developer review, not independent penetration testing or an assurance of zero defects. The freestanding server is an immutable local asset host, not a new secure account/TLS/API platform. The company stack still carries the previous license blockers. Imported Office fidelity, accessibility, spreadsheet semantics and large-document performance need broader testing before enterprise rollout. Existing team accounts and stored native files are preserved.
+
+## AI provider settings (2026-10-14)
+
+Reviewed the original `server/ai-settings.js` and optional host-only
+`scripts/studio-ai-gateway.mjs`. The Studio image still contains the same ten original
+browser assets and freestanding server. Its sole browser fetch primitive now validates
+both model endpoints and exact paths at `http://127.0.0.1:3210`. No direct OpenAI browser
+connection is permitted by code or CSP. No new libraries were introduced.
+
+The host gateway binds loopback, verifies Host and Origin, requires a random pairing
+capability, bounds bodies and concurrency, refuses redirects, and pins selected model
+and provider on the server. It does not execute model tools: the existing browser
+permission boundary does. Pairing is session-only; provider keys are never returned.
+Company setting writes/list/test require authenticated admin authority and existing
+CSRF protection. Audit entries include provider/model only. Saved revisions prevent
+lost setting updates and stale gateway agent requests.
+
+Residual limits: host filesystem ACLs protect the master encryption key; a compromised
+host/browser can use the configured model, and this is not a multi-user gateway.
+Node/host OS/model services remain external and outside the Studio artifact's license
+approval. Provider calls were fixture-tested, not tested with a paid OpenAI account.

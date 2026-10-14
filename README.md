@@ -133,3 +133,11 @@ The stable workspace is on `main`. The separate `feature/romania-spv` branch is 
 See [architecture](docs/ARCHITECTURE.md), [security review](docs/2026-10-13-code-audit-reverse-office-report.md), and [validation](docs/VALIDATION.md).
 
 The requested [reverse-skill](https://github.com/zhaoxuya520/reverse-skill) was cloned to the sibling `reverse-skill-reference` folder and routed to `code-audit`. Its scope and evidence artifacts live under `work/security-review`. It was used for the owned-code security workflow, not for bypassing commercial products or reproducing their proprietary code.
+
+### AI provider settings
+
+Choose the provider and model in **Administration → AI settings** (company) or
+**Ask AI → AI settings** (Studio). Supports OpenAI API keys stored on the server and
+local OpenAI-compatible models, with model listing and connection tests. Studio uses
+an optional paired host gateway for OpenAI: `npm run studio:ai`. No new npm dependencies
+or model runtimes are bundled. See [setup and key storage](docs/ASSISTANT.md#choose-a-provider-and-model-in-settings).

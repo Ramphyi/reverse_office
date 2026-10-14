@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { LOCAL_PROVIDERS } from '../public/studio/agent.js';
+import { LOCAL_PROVIDERS, GATEWAY } from '../public/studio/agent.js';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const assets = [
   'LICENSE',
@@ -21,6 +21,7 @@ const assets = [
 const directory = path.join(root, 'public', 'studio');
 const actual = readdirSync(directory).sort();
 const issues = [];
+if (GATEWAY !== 'http://127.0.0.1:3210') issues.push('Unreviewed AI gateway origin');
 if (
   JSON.stringify(LOCAL_PROVIDERS) !==
   JSON.stringify([
