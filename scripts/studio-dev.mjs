@@ -1,7 +1,18 @@
 // Development/test host only. Node is not distributed in the standalone Studio image.
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
-const files = new Set(['index.html', 'app.js', 'core.js', 'formats.js', 'styles.css', 'LICENSE']);
+const files = new Set([
+  'index.html',
+  'agent.js',
+  'app.js',
+  'core.js',
+  'formats.js',
+  'assistant.js',
+  'floating.js',
+  'search.js',
+  'styles.css',
+  'LICENSE',
+]);
 http
   .createServer(async (req, res) => {
     const name = new URL(req.url, 'http://localhost').pathname.slice(1) || 'index.html';

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Reverse Office contributors
+import { mountAssistant, mountNavigation } from './assistant.js';
 import {
   clone,
   newDocument,
@@ -380,7 +381,7 @@ function renderHome() {
           'aside',
           { class: 'privacy' },
           el('strong', {}, 'Your files stay with you.'),
-          'Documents save in this browser on this device. Export backups to keep them safe. This Studio does not upload files or require an account.',
+          'Documents save in this browser. Export backups to keep them safe. Optional agents send requested context to your configured local model only when you press Send. No account is required.',
         ),
       ),
       el(
@@ -2190,3 +2191,35 @@ if (embedded) {
       ),
     );
   });
+
+if (!embedded)
+  mountAssistant({
+    getDocuments: readAll,
+    getCurrent: () => doc,
+    onOpen: async (id, location) => {
+      const value = doc?.id === id ? doc : (await readAll()).find((d) => d.id === id);
+      if (!value) throw Error('Document no longer exists.');
+      if (doc?.id !== id) await openDocument(value);
+      if (value.kind === 'sheet' && location.includes('!')) {
+        const split = location.lastIndexOf('!'),
+          sheetName = location.slice(0, split),
+          cell = location.slice(split + 1);
+        const index = value.sheets.findIndex((sheet) => sheet.name === sheetName);
+        if (index >= 0 && /^[A-Z]+[1-9][0-9]*$/.test(cell)) {
+          doc.activeSheet = index;
+          selection = [cell, cell];
+          renderEditor();
+        }
+      }
+    },
+  });
+
+if (!embedded)
+  mountNavigation([
+    { id: 'home', label: 'Documents', symbol: '⌂', run: home },
+    { id: 'doc', label: 'New Writer document', symbol: 'W', run: () => create('doc') },
+    { id: 'sheet', label: 'New spreadsheet', symbol: '▦', run: () => create('sheet') },
+    { id: 'slides', label: 'New presentation', symbol: '▱', run: () => create('slides') },
+    { id: 'import', label: 'Import a file', symbol: '↑', run: importDocument },
+    { id: 'help', label: 'Studio help', symbol: '?', run: showHelp },
+  ]);

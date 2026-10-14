@@ -16,7 +16,7 @@ await check('Immutable asset manifest matches reviewed source bytes', async () =
   assert.equal(response.status, 200);
   const manifest = await response.json();
   assert.equal(manifest.license, 'MIT');
-  assert.equal(manifest.assets.length, 6);
+  assert.equal(manifest.assets.length, 10);
   for (const asset of manifest.assets) {
     const response = await fetch(base + '/' + asset.path);
     assert.equal(response.status, 200);
@@ -26,20 +26,23 @@ await check('Immutable asset manifest matches reviewed source bytes', async () =
     assert.equal(createHash('sha256').update(source).digest('hex'), asset.sha256);
   }
 });
-await check('CSP disables network, objects, foreign framing and remote assets', async () => {
-  const response = await fetch(base);
-  const csp = response.headers.get('content-security-policy');
-  for (const directive of [
-    "default-src 'none'",
-    "script-src 'self'",
-    "connect-src 'none'",
-    "object-src 'none'",
-    "frame-ancestors 'self'",
-  ])
-    assert.ok(csp.includes(directive));
-  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
-  assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
-});
+await check(
+  'CSP limits model networking to explicit loopback origins and blocks foreign assets',
+  async () => {
+    const response = await fetch(base);
+    const csp = response.headers.get('content-security-policy');
+    for (const directive of [
+      "default-src 'none'",
+      "script-src 'self'",
+      'connect-src http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234',
+      "object-src 'none'",
+      "frame-ancestors 'self'",
+    ])
+      assert.ok(csp.includes(directive));
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
+  },
+);
 await check('Read-only exact paths reject writes and traversal; HEAD has no body', async () => {
   for (const path of [
     '/server.c',

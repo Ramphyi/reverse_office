@@ -1,6 +1,7 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { importOffice, checkZipLimits } from './exports.js';
 import JSZip from 'jszip';
+import ExcelJS from 'exceljs';
 import { XMLParser } from 'fast-xml-parser';
 try {
   const buffer = Buffer.from(workerData.buffer);
@@ -34,6 +35,28 @@ try {
     result = {
       note: 'Saved native file; bounded XML excerpts. Unsaved edits are not included.',
       parts: snippets,
+    };
+  } else if (workerData.mode === 'assistant' && workerData.originalname.endsWith('.xlsx')) {
+    checkZipLimits(buffer);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    let remaining = 10000;
+    const sheets = workbook.worksheets.slice(0, 20).map((sheet) => {
+      const cells = {};
+      sheet.eachRow((row) =>
+        row.eachCell((cell) => {
+          if (remaining <= 0 || cell.row > 1000 || cell.col > 100) return;
+          remaining--;
+          cells[cell.address] = cell.formula ? '=' + cell.formula : cell.text;
+        }),
+      );
+      return { name: sheet.name, cells };
+    });
+    result = {
+      content: {
+        sheets,
+        note: 'Saved native workbook; limited to 20 sheets and 10000 populated cells.',
+      },
     };
   } else result = await importOffice({ ...workerData, buffer });
   parentPort.postMessage({ result });

@@ -1,4 +1,418 @@
 /* SPDX-License-Identifier: MIT */
+/* Floating workspace tools: native controls, original styles, no external assets. */
+.studio-navigation-launch {
+  position: fixed;
+  bottom: 22px;
+  left: 14px;
+  z-index: 100;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 8px 30px #172c2825;
+  touch-action: none;
+}
+.studio-navigation {
+  position: fixed;
+  z-index: 105;
+  top: 8px;
+  bottom: 76px;
+  left: 8px;
+  max-width: calc(100vw - 24px);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 14px 65px #11251c35;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: assistant-in 0.18s ease-out;
+}
+.studio-navigation[hidden],
+.studio-shortcut-settings[hidden] {
+  display: none;
+}
+.studio-navigation header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.studio-navigation header strong {
+  flex: 1;
+  font-size: 13px;
+}
+.studio-navigation header button {
+  padding: 4px 6px;
+  border: 0;
+}
+.studio-navigation nav {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.studio-navigation nav button {
+  text-align: left;
+  border: 0;
+  padding: 13px 10px;
+  font-size: 13px;
+  border-radius: 10px;
+  white-space: nowrap;
+  cursor: grab;
+}
+.studio-navigation nav button:hover {
+  background: #9472b826;
+}
+.studio-navigation-note {
+  margin-top: auto;
+  font-size: 10px;
+  color: var(--muted);
+}
+.studio-navigation-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 9px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.studio-navigation-edge:hover {
+  background: #8d6fbd44;
+}
+.studio-shortcut-settings {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  overflow: auto;
+}
+.studio-shortcut-settings > div {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 7px;
+  font-size: 10px;
+}
+.studio-shortcut-settings label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.studio-shortcut-settings button {
+  padding: 3px 5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-navigation {
+    animation: none;
+  }
+}
+@media print {
+  .studio-navigation,
+  .studio-navigation-launch {
+    display: none !important;
+  }
+}
+.studio-ai-launcher {
+  position: fixed;
+  right: 24px;
+  bottom: 22px;
+  z-index: 100;
+  padding: 14px 22px;
+  border-radius: 28px;
+  background: linear-gradient(120deg, #574584, #8e6fc2);
+  color: white;
+  border: 1px solid #b9a5d8;
+  box-shadow: 0 10px 35px #43316445;
+  transition: transform 0.18s;
+}
+.studio-ai-launcher:hover {
+  transform: translateY(-3px);
+  background: linear-gradient(120deg, #655099, #9a7bd0);
+}
+.studio-assistant {
+  position: fixed;
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 20px 90px #18122250;
+  animation: assistant-in 0.22s ease-out;
+}
+.studio-assistant[hidden] {
+  display: none;
+}
+.studio-assistant > * {
+  flex-shrink: 0;
+}
+.studio-assistant-handle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+.studio-assistant-handle > div {
+  flex: 1;
+}
+.studio-assistant-handle strong {
+  display: block;
+  font-size: 19px;
+}
+.studio-assistant-handle small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.studio-assistant button {
+  cursor: pointer;
+}
+.studio-assistant-handle button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 21px;
+}
+.studio-ai-note {
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 0 17px;
+  color: var(--muted);
+}
+.studio-ai-options {
+  padding: 0 15px 10px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+.studio-ai-options small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 10px;
+}
+.studio-model-settings {
+  max-width: 480px;
+  width: calc(100vw - 32px);
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  color: var(--ink);
+  background: var(--panel);
+}
+.studio-model-settings::backdrop {
+  background: #1118;
+}
+.studio-model-settings form {
+  display: grid;
+  gap: 12px;
+}
+.studio-model-settings p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+.studio-model-settings input:not([type='checkbox']),
+.studio-model-settings select {
+  width: 100%;
+}
+.studio-model-settings label {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.studio-agent-answer {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+.studio-agent-steps {
+  border-left: 2px solid #9474be;
+  padding-left: 10px;
+}
+.studio-ai-actions [hidden] {
+  display: none;
+}
+.studio-ai-options select {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: inherit;
+}
+.studio-ai-messages {
+  flex: 1;
+  min-height: 50px;
+  overflow: auto;
+  padding: 0 17px 10px;
+}
+.studio-ai-welcome {
+  padding: 22px 4px;
+}
+.studio-ai-welcome span {
+  font-size: 9px;
+  color: #8f75b5;
+  letter-spacing: 2px;
+}
+.studio-ai-welcome h2 {
+  font-size: 35px;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  white-space: pre-line;
+  margin: 14px 0;
+}
+.studio-ai-welcome p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.studio-ai-question {
+  background: #8f70c522;
+  border-radius: 12px;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+.studio-ai-result {
+  font-size: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.studio-ai-result small {
+  display: block;
+  color: #967ac1;
+  margin-bottom: 12px;
+}
+.studio-ai-result button {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-decoration: underline;
+  padding: 3px 0;
+  font-weight: 600;
+}
+.studio-ai-result table {
+  font-size: 11px;
+  width: 100%;
+  border-collapse: collapse;
+}
+.studio-ai-result td,
+.studio-ai-result th {
+  padding: 4px;
+  border: 1px solid var(--line);
+}
+.studio-ai-composer {
+  margin: 8px 12px 22px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.studio-ai-composer textarea {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  min-height: 48px;
+  max-height: 100px;
+  resize: vertical;
+  font: inherit;
+  font-size: 13px;
+  padding: 5px;
+}
+.studio-ai-actions {
+  display: flex;
+  gap: 6px;
+}
+.studio-ai-actions button {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: inherit;
+  padding: 6px 9px;
+  font-size: 11px;
+  border-radius: 9px;
+}
+.studio-ai-actions button:last-child {
+  margin-left: auto;
+  background: #765b9e;
+  color: white;
+}
+.studio-ai-previews {
+  display: flex;
+  gap: 8px;
+}
+.studio-ai-previews > div {
+  position: relative;
+}
+.studio-ai-previews img {
+  width: 54px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.studio-ai-previews button {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+}
+.studio-ai-error {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 4px 0;
+}
+.studio-assistant .studio-ai-resize {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9579bb;
+  width: 24px;
+  height: 24px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+@keyframes assistant-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-assistant,
+  .studio-ai-launcher {
+    animation: none;
+    transition: none;
+  }
+}
+@media print {
+  .studio-assistant,
+  .studio-ai-launcher {
+    display: none !important;
+  }
+}
 :root {
   font-family: Arial, Helvetica, sans-serif;
   color: var(--ink);

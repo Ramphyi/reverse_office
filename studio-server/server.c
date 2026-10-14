@@ -25,7 +25,7 @@ struct asset {const char *path;const char *mime;const unsigned char *data;usize 
 static void respond(word fd,const char *status,const char *mime,const unsigned char *body,usize size,int head){
   char header[1800],*p=header;
   p=append(p,"HTTP/1.1 ");p=append(p,status);p=append(p,"\r\nContent-Type: ");p=append(p,mime);p=append(p,"\r\nContent-Length: ");p=decimal(p,size);
-  p=append(p,"\r\nConnection: close\r\nCache-Control: no-cache\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nCross-Origin-Resource-Policy: same-origin\r\nX-Frame-Options: SAMEORIGIN\r\nContent-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'\r\nPermissions-Policy: camera=(), microphone=(), geolocation=()\r\n\r\n");
+  p=append(p,"\r\nConnection: close\r\nCache-Control: no-cache\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nCross-Origin-Resource-Policy: same-origin\r\nX-Frame-Options: SAMEORIGIN\r\nContent-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'\r\nPermissions-Policy: camera=(), microphone=(), geolocation=()\r\n\r\n");
   if(sendall(fd,(unsigned char*)header,(usize)(p-header))&&!head)sendall(fd,body,size);
 }
 static void request(word fd){

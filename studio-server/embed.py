@@ -7,7 +7,7 @@ import json
 
 root = Path(__file__).resolve().parent.parent
 web = root / 'public' / 'studio'
-names = ['index.html', 'app.js', 'core.js', 'formats.js', 'styles.css', 'LICENSE']
+names = ['index.html', 'agent.js', 'app.js', 'core.js', 'formats.js', 'assistant.js', 'floating.js', 'search.js', 'styles.css', 'LICENSE']
 allowed = set(names)
 if {p.name for p in web.iterdir() if p.is_file()} != allowed:
     raise SystemExit('Unexpected Studio assets; update the reviewed file allowlist first.')

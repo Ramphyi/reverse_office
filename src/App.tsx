@@ -76,6 +76,7 @@ import { StudioEditor } from './StudioEditor';
 import { TemplateGallery } from './TemplateGallery';
 import { ThemePicker, useTheme } from './Theme';
 import { Assistant } from './Assistant';
+import { WorkspaceSidebar } from './WorkspaceSidebar';
 import { Chat, Meetings } from './Collaboration';
 import { Admin, TimeOff, Reports, Timesheets } from './Operations';
 import { Romania } from './Romania';
@@ -490,85 +491,21 @@ export default function App() {
     });
   return (
     <div className={`app ${ai ? 'assistant-open' : ''}`}>
-      <aside className={`sidebar ${mobile ? 'mobile-open' : ''}`}>
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            navigate('home');
-          }}
-        >
-          <div className="brand-mark">
-            r<span>o</span>
-            <i />
-          </div>
-          <div>
-            reverse<span>office</span>
-          </div>
-        </a>
-        <div className="workspace-switch">
-          <span className="workspace-monogram">W</span>
-          <div>
-            <strong>{organisation.name || 'My workspace'}</strong>
-            <small>{organisation.timezone || 'Private workspace'}</small>
-          </div>
-          <LockKeyhole size={13} />
-        </div>
-        <nav>
-          {sections.map((section) => (
-            <div className="nav-section" key={section.label}>
-              <div className="nav-label">{section.label}</div>
-              {section.items
-                .filter(
-                  ([id]) => !['reports', 'admin', 'billing'].includes(String(id)) || isManager,
-                )
-                .map(([id, label, Icon]: any) => (
-                  <button
-                    key={id}
-                    aria-label={label}
-                    onClick={() => navigate(id)}
-                    className={page === id ? 'active' : ''}
-                  >
-                    <Icon size={17} />
-                    <span>{label}</span>
-                    {id === 'chat' && <span className="nav-dot" />}
-                    {id === 'timesheets' && <span className="nav-shortcut">⌘</span>}
-                  </button>
-                ))}
-            </div>
-          ))}
-        </nav>
-        <button className="sidebar-ai" onClick={() => setAi(true)}>
-          <span>
-            <Sparkles size={18} />
-          </span>
-          <div>
-            <strong>A little help. A big difference.</strong>
-            <small>
-              Meet your workspace assistant <ArrowUpRight size={12} />
-            </small>
-          </div>
-        </button>
-        <div className="sidebar-user">
-          <span className="avatar">{initials(user.name)}</span>
-          <div>
-            <strong>{user.name}</strong>
-            <small>{user.role === 'admin' ? 'Workspace administrator' : user.role}</small>
-          </div>
-          <button
-            className="icon-button"
-            aria-label="Sign out"
-            onClick={async () => {
-              await api('/logout', 'POST');
-              setAuth(null);
-              setDoc(null);
-            }}
-          >
-            <LogOut size={15} />
-          </button>
-        </div>
-      </aside>
+      <WorkspaceSidebar
+        key={user.id}
+        sections={sections}
+        user={user}
+        organisation={organisation}
+        page={page}
+        mobile={mobile}
+        navigate={navigate}
+        onAi={() => setAi(true)}
+        onLogout={async () => {
+          await api('/logout', 'POST');
+          setAuth(null);
+          setDoc(null);
+        }}
+      />
       <div className="main-shell">
         <header className="topbar">
           <button
@@ -1276,8 +1213,20 @@ export default function App() {
           </span>
         </footer>
       </div>
-      {ai && (
+      <>
+        <button
+          className="ai-launcher"
+          aria-label={ai ? 'Minimize assistant' : 'Open floating assistant'}
+          aria-expanded={ai}
+          onClick={() => setAi(!ai)}
+        >
+          <Sparkles size={22} />
+          <span>Ask AI</span>
+        </button>
         <Assistant
+          key={user.id}
+          open={ai}
+          userId={user.id}
           doc={doc}
           onClose={() => setAi(false)}
           onOpenDocument={(id) => {
@@ -1285,7 +1234,7 @@ export default function App() {
             if (found) setDoc(found);
           }}
         />
-      )}
+      </>
       {modal && (
         <FormModal
           title={modal.title}
