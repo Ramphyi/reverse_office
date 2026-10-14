@@ -78,3 +78,6 @@ The new browser scenario verifies 8-hour defaults and +/- controls, special-occa
 SMTP uses an injected transport in automated tests; external relay delivery, provider authentication and inbound adapter deployment have **not** been verified with live credentials. This release adds the gateway contract, not IMAP synchronization or Microsoft/Google OAuth. See [productivity and mail setup](PRODUCTIVITY.md) for supported behavior and limits.
 
 No dependencies or distributed runtime components were added. The strict license gate remains blocked for the full company image. Functional validation and the isolated host development preview do not certify or redeploy that Docker distribution.
+
+
+Romania productivity integration, 2026-10-14: `feature/romania-spv` passes the production build, **80/80 backend tests** and **9/9 browser scenarios**, including invoice issuance, UBL, payment, print and mobile billing. ANAF remains simulated; no live submission or distribution deployment was performed.
