@@ -37,7 +37,7 @@ Limits: 20 worksheets, 1,000 rows and 100 columns per worksheet; 100 slides; 20 
 
 ## Assistant
 
-Ask AI opens a movable, resizable window with local document/cell search, image attachments and optional generative agents through a separately operated local model. See [assistant configuration and limits](ASSISTANT.md). The container includes the original client/tool code, not a model or inference runtime.
+Ask AI opens a movable, resizable window with local document/cell search, image attachments and optional generative agents through OpenAI with a paired host gateway or a separately operated local model. See [assistant configuration and limits](ASSISTANT.md). The container includes the original client/tool code, not a model or inference runtime.
 
 ## Exact distributed contents and deployment
 
@@ -70,3 +70,8 @@ npm run test:studio
 Tests cover formula evaluation and errors, relative fills, CSV quoting, ZIP integrity, unsafe imports, persisted editing, stale-tab conflicts, merge/chart export, real XLSX parsing with ExcelJS, DOCX/PPTX XML package contents, and the company save bridge. Test tools are development dependencies and are not copied into the Studio image. Full company regression checks remain separate from the standalone image's audit.
 
 Security review applies the user-requested reverse-skill code-audit methodology to these original source files: explicit trust boundaries, dangerous API searches, and manual reproduction of unsafe-input and conflict scenarios. No third-party product binaries or accounts were targeted.
+
+AI provider/model selection is available in Ask AI → AI settings. OpenAI uses the
+optional paired host gateway (`npm run studio:ai`); direct local model connections
+remain supported. See [AI settings and key storage](ASSISTANT.md#choose-a-provider-and-model-in-settings)
+for setup, runtime/license boundaries and key removal.

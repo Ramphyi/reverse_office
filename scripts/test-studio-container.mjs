@@ -34,7 +34,7 @@ await check(
     for (const directive of [
       "default-src 'none'",
       "script-src 'self'",
-      'connect-src http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234',
+      'connect-src http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234 http://127.0.0.1:3210;',
       "object-src 'none'",
       "frame-ancestors 'self'",
     ])

@@ -296,21 +296,21 @@ export async function openCodeCompletion(messages, availableTools, signal) {
   }
 }
 
-export function installAssistant(app, { store, readable, visible, office, safeImport, fail }) {
+export function installAssistant(
+  app,
+  { store, readable, visible, office, safeImport, fail, aiSettings },
+) {
   const active = new Map();
   app.get('/api/ai/agents', (req, res) =>
     res.json({
       agents,
       tools: tools.map((t) => ({ name: t.function.name, description: t.function.description })),
-      engine: process.env.OPENCODE_BASE_URL
-        ? 'OpenCode'
-        : process.env.AI_BASE_URL
-          ? 'Compatible AI'
-          : 'Local search',
-      vision: process.env.AI_VISION === 'true' && !process.env.OPENCODE_BASE_URL,
+      engine: aiSettings.current().provider,
+      vision: aiSettings.current().vision && aiSettings.current().provider !== 'opencode',
     }),
   );
   app.post('/api/ai', async (req, res) => {
+    const config = aiSettings.current();
     const data = input.parse(req.body);
     validateImages(data.images);
     const checkIdentity = () => {
@@ -327,13 +327,11 @@ export function installAssistant(app, { store, readable, visible, office, safeIm
     if (data.documentId) getDocument(data.documentId);
     if (
       data.images.length &&
-      (process.env.AI_VISION !== 'true' ||
-        process.env.OPENCODE_BASE_URL ||
-        !process.env.AI_BASE_URL)
+      (!config.vision || config.provider === 'opencode' || config.provider === 'disabled')
     )
       fail(
         400,
-        'Image analysis requires a vision-capable AI_BASE_URL provider and AI_VISION=true. Images have not been sent to a provider.',
+        'Image analysis requires a vision-capable provider enabled in AI settings. Images have not been sent to a provider.',
       );
     if (active.has(req.user.id))
       fail(429, 'An assistant request is already running for your account');
@@ -447,31 +445,9 @@ export function installAssistant(app, { store, readable, visible, office, safeIm
     };
     const complete = async (messages, available) => {
       if (++calls > 8) throw Error('Agent model-call budget exhausted');
-      if (process.env.OPENCODE_BASE_URL)
+      if (config.provider === 'opencode')
         return openCodeCompletion(messages, available, controller.signal);
-      const response = await fetch(
-        `${process.env.AI_BASE_URL.replace(/\/$/, '')}/chat/completions`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(process.env.AI_API_KEY
-              ? { Authorization: `Bearer ${process.env.AI_API_KEY}` }
-              : {}),
-          },
-          body: JSON.stringify({
-            model: process.env.AI_MODEL || 'qwen2.5:7b',
-            messages,
-            tools: available,
-            temperature: 0.3,
-            max_tokens: 3000,
-          }),
-          signal: controller.signal,
-          redirect: 'error',
-        },
-      );
-      if (!response.ok) throw Error('The AI provider could not complete the request');
-      const output = await boundedJson(response);
+      const output = await aiSettings.complete(config, messages, available, controller.signal);
       return output.choices?.[0]?.message || { content: 'No response returned.' };
     };
     const runAgent = async (agentId, prompt, depth = 0) => {
@@ -530,7 +506,7 @@ export function installAssistant(app, { store, readable, visible, office, safeIm
     };
     try {
       let text, provider;
-      if (!process.env.AI_BASE_URL && !process.env.OPENCODE_BASE_URL) {
+      if (config.provider === 'disabled') {
         const output = await runTool('workspace_search', { query: data.prompt.slice(0, 200) }, 0);
         provider = 'Workspace search (AI not configured)';
         text = output.matches.length
@@ -540,9 +516,7 @@ export function installAssistant(app, { store, readable, visible, office, safeIm
           '\n\nLocal search completed. Generative agents require an AI provider or an OpenCode server.';
       } else {
         text = await runAgent(data.agent, data.prompt);
-        provider = process.env.OPENCODE_BASE_URL
-          ? 'OpenCode'
-          : process.env.AI_MODEL || 'Workspace AI';
+        provider = config.provider === 'opencode' ? 'OpenCode' : config.model || 'Workspace AI';
       }
       // Access may have changed while the model was running. Never return stale private sources.
       checkIdentity();

@@ -100,13 +100,14 @@ export function Assistant({
     }
   }
   useEffect(() => {
+    if (!open) return;
     api('/ai/agents')
       .then(setCatalog)
       .catch(() => {});
     api('/integrations')
       .then(setService)
       .catch(() => {});
-  }, []);
+  }, [open]);
   useEffect(() => {
     scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: 'smooth' });
   }, [messages, busy]);

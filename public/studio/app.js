@@ -381,7 +381,7 @@ function renderHome() {
           'aside',
           { class: 'privacy' },
           el('strong', {}, 'Your files stay with you.'),
-          'Documents save in this browser. Export backups to keep them safe. Optional agents send requested context to your configured local model only when you press Send. No account is required.',
+          'Documents save in this browser. Export backups to keep them safe. Optional agents send requested context to your chosen AI provider only when you press Send. No account is required.',
         ),
       ),
       el(
