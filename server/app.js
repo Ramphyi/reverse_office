@@ -1,3 +1,5 @@
+import { installMailbox, installMailIngress, canReadMail, publicMail } from './mailbox.js';
+import { drivePermission, installDriveSharing } from './drive-sharing.js';
 import { installChatInvites, chatDirectory } from './chat-spaces.js';
 import { installChat } from './chat.js';
 import { createAISettings, installAISettings } from './ai-settings.js';
@@ -6,7 +8,6 @@ import { installAssistant } from './assistant.js';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
-import nodemailer from 'nodemailer';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -52,6 +53,7 @@ export function createApp({
   setupKey = process.env.SETUP_KEY || randomBytes(24).toString('hex'),
   test = false,
   officeOptions,
+  mailOptions,
 } = {}) {
   const sessionCookie = process.env.SESSION_COOKIE || 'ro_session';
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(sessionCookie)) throw Error('Invalid session cookie name');
@@ -162,6 +164,7 @@ export function createApp({
     store.audit(user.id, 'login', 'session');
     res.json(signIn(res, user));
   });
+  installMailIngress(app, { store, uploadDir, fail });
   installChatInvites(app, { store, fail, signIn, loginLimit });
   app.use('/api', (req, res, next) => {
     const user = session(req);
@@ -198,11 +201,16 @@ export function createApp({
           '/entities/messages',
           '/entities/events',
           '/rtc-config',
+          '/drive/shared',
         ].includes(req.path);
+      const sharedFile =
+        req.method === 'GET' &&
+        (/^\/files\/[^/]+\/(download|preview)$/.test(req.path) ||
+          /^\/documents\/[^/]+\/export\/(docx|xlsx|pptx|pdf|txt|csv)$/.test(req.path));
       const self = ['/password', '/logout', '/profile'].includes(req.path);
       const chat = req.path.startsWith('/chat/') && !req.path.startsWith('/chat/admin/');
       const message = /^\/entities\/messages(?:\/[^/]+)?$/.test(req.path);
-      if (!read && !self && !chat && !message)
+      if (!read && !self && !chat && !message && !sharedFile)
         return res.status(403).json({
           error: 'External accounts can only access their conversations and account settings',
         });
@@ -239,6 +247,8 @@ export function createApp({
   };
   function readable(user, kind, item) {
     if (!item) return false;
+    const shared = drivePermission(store, user, kind, item);
+    if (shared) return shared !== 'none';
     if (user.role === 'guest') {
       if (kind === 'channels')
         return ['group', 'direct'].includes(item.visibility) && item.memberIds?.includes(user.id);
@@ -248,7 +258,7 @@ export function createApp({
         return item.call && readable(user, 'channels', store.get('channels', item.channelId));
       return false;
     }
-    if (kind === 'mail') return item.owner === user.id || item.recipientId === user.id;
+    if (kind === 'mail') return canReadMail(user, item);
     if (['timesheets', 'leave', 'entitlements'].includes(kind))
       return manager(user) || item.userId === user.id || item.owner === user.id;
     if (kind === 'calendars') return true;
@@ -275,6 +285,8 @@ export function createApp({
   }
   function writable(user, kind, item) {
     if (!readable(user, kind, item)) return false;
+    const shared = drivePermission(store, user, kind, item);
+    if (shared) return shared === 'owner';
     if (
       (kind === 'events' && item.call) ||
       (kind === 'channels' && ['direct', 'group'].includes(item.visibility))
@@ -287,7 +299,14 @@ export function createApp({
     return true;
   }
   function visible(user, kind, item) {
+    if (kind === 'mail') return publicMail(user, item);
     if (['documents', 'files'].includes(kind)) {
+      const policy = store.get('drivePermissions', `drive:${kind}:${item.id}`);
+      item = {
+        ...item,
+        sharingMode: policy?.mode || (item.projectId ? 'project' : 'private'),
+        canEdit: writable(user, kind, item),
+      };
       const native = office.metadata(item.id);
       if (native) item = { ...item, office: native, updated: native.updated };
     }
@@ -320,7 +339,9 @@ export function createApp({
       fail(403, 'Manager access required');
     if (
       kind === 'projects' &&
-      data.members.some((id) => !store.users().some((u) => u.id === id && u.active))
+      data.members.some(
+        (id) => !store.users().some((u) => u.id === id && u.active && u.role !== 'guest'),
+      )
     )
       fail(400, 'Unknown project member');
     if (
@@ -436,6 +457,7 @@ export function createApp({
       fail(413, 'Document is too large');
   }
   workforce.install(app, { validateRefs, credentialLimit: loginLimit });
+  installDriveSharing(app, { store, readable, visible, fail });
   const chat = installChat(app, { store, readable, session, uploadDir, fail });
   app.get('/api/users', (req, res) =>
     res.json(
@@ -872,6 +894,7 @@ export function createApp({
   app.post('/api/files/:id/sign', async (req, res) => {
     const f = store.get('files', req.params.id);
     if (!readable(req.user, 'files', f)) fail(403, 'File is not accessible');
+    if (!writable(req.user, 'files', f)) fail(403, 'Read-only file');
     if (f.mime !== 'application/pdf') fail(400, 'Choose a PDF');
     const { reason, mode } = z
       .object({
@@ -955,61 +978,7 @@ export function createApp({
     store.audit(req.user.id, 'pdf.sign', result.id, { mode, source: f.id, hash: result.sha256 });
     res.status(201).json(result);
   });
-  app.get('/api/mail', (req, res) =>
-    res.json(store.all('mail').filter((x) => readable(req.user, 'mail', x))),
-  );
-  app.post('/api/mail', async (req, res) => {
-    const mail = schemas.mail.parse(req.body),
-      recipient = store.users().find((u) => u.email === mail.to.toLowerCase() && u.active);
-    if (!recipient && !process.env.SMTP_HOST)
-      fail(503, 'External email needs SMTP configuration. Internal mail is available.');
-    const record = store.put(
-      'mail',
-      {
-        ...mail,
-        from: req.user.email,
-        recipientId: recipient?.id ?? '',
-        status: recipient ? 'Delivered internally' : 'Sending',
-      },
-      req.user.id,
-    );
-    if (!recipient) {
-      try {
-        const transport = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: Number(process.env.SMTP_PORT || 587),
-          secure: process.env.SMTP_SECURE === 'true',
-          auth: process.env.SMTP_USER
-            ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
-            : undefined,
-        });
-        await transport.sendMail({
-          from: process.env.SMTP_FROM || req.user.email,
-          replyTo: req.user.email,
-          to: mail.to,
-          subject: mail.subject,
-          text: mail.body,
-        });
-        store.put(
-          'mail',
-          { ...mail, from: req.user.email, recipientId: '', status: 'Sent' },
-          req.user.id,
-          record.id,
-          record.version,
-        );
-      } catch {
-        store.put(
-          'mail',
-          { ...mail, from: req.user.email, recipientId: '', status: 'Failed' },
-          req.user.id,
-          record.id,
-          record.version,
-        );
-        fail(502, 'SMTP delivery failed; the message is marked Failed.');
-      }
-    }
-    res.status(201).json(store.get('mail', record.id));
-  });
+  installMailbox(app, { store, fail, uploadDir, ...mailOptions });
   app.get('/api/integrations', (req, res) =>
     res.json({
       ai: aiSettings.current().provider !== 'disabled',
@@ -1039,7 +1008,7 @@ export function createApp({
   );
   // Optional deployment-specific extension; the Romania branch registers billing here.
   app.locals.extension = { store, session, readable, manager, fail };
-  office.install(app, { readable, ensureProject });
+  office.install(app, { readable, writable, ensureProject });
   app.locals.installFinalHandlers = () => {
     app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint not found' }));
     const dist = path.resolve('dist');

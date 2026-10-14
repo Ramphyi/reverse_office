@@ -1,3 +1,4 @@
+import { TimeEntry, HoursStepper, activities, isAbsence } from './TimeEntry';
 import { useEffect, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Download, Plus } from 'lucide-react';
 import {
@@ -54,6 +55,7 @@ export function WorkCalendar({
   useEffect(() => {
     if (!selected.startsWith(month)) setSelected(month + '-01');
   }, [month]);
+  const [weekActivity, setWeekActivity] = useState<Record<string, string>>({});
   const [weekHours, setWeekHours] = useState<Record<string, string>>({}),
     [weekProject, setWeekProject] = useState(''),
     [description, setDescription] = useState(''),
@@ -99,42 +101,12 @@ export function WorkCalendar({
       kind: 'time',
       date,
       projectId: project || projects[0]?.id,
-      hours: Math.min(data?.days.find((d: Item) => d.date === date)?.remaining || 8, 8),
+      hours: 8,
       status: 'Draft',
       billable: true,
     });
   const weekStart = shift(selected, -((new Date(selected + 'T12:00:00Z').getUTCDay() + 6) % 7)),
     week = Array.from({ length: 7 }, (_, i) => shift(weekStart, i));
-  const timeFields: any[] = [
-    {
-      key: 'projectId',
-      label: 'Project',
-      type: 'select',
-      required: true,
-      options: projects.map((p) => ({ value: p.id, label: p.title })),
-    },
-    { key: 'date', label: 'Work date', type: 'date', required: true },
-    {
-      key: 'hours',
-      label: 'Hours worked',
-      type: 'number',
-      min: 0.25,
-      max: 24,
-      step: '.25',
-      required: true,
-    },
-    { key: 'description', label: 'What did you work on?', type: 'textarea', required: true },
-    { key: 'billable', label: 'Billable to client', type: 'checkbox', default: true },
-    {
-      key: 'status',
-      label: 'Save as',
-      type: 'select',
-      options: [
-        { value: 'Draft', label: 'Draft' },
-        { value: 'Submitted', label: 'Submit for approval' },
-      ],
-    },
-  ];
   return (
     <section className="work-calendar panel" aria-label="Shared work calendar">
       <div className="work-calendar-heading">
@@ -368,7 +340,15 @@ export function WorkCalendar({
                       <button
                         className="button secondary"
                         onClick={() => {
-                          setWeekHours({});
+                          setWeekHours(
+                            Object.fromEntries(
+                              week.map((date) => {
+                                const d = data.days.find((d: Item) => d.date === date);
+                                return [date, String(Math.min(8, d?.remaining || 0))];
+                              }),
+                            ),
+                          );
+                          setWeekActivity({});
                           setWeekProject(project || projects[0]?.id || '');
                           setWeekly(true);
                         }}
@@ -393,7 +373,18 @@ export function WorkCalendar({
           </div>
         </>
       )}
-      {form && (
+      {form?.kind === 'time' && (
+        <TimeEntry
+          initial={form}
+          projects={projects}
+          onClose={() => setForm(null)}
+          onSaved={async () => {
+            await refresh();
+            notify('Calendar updated');
+          }}
+        />
+      )}
+      {form && form.kind !== 'time' && (
         <FormModal
           title={
             form.kind === 'time'
@@ -407,28 +398,29 @@ export function WorkCalendar({
           initial={form}
           onClose={() => setForm(null)}
           fields={
-            form.kind === 'time'
-              ? timeFields
-              : form.kind === 'cancel'
-                ? [
-                    {
-                      key: 'reason',
-                      label: 'Reason for cancellation',
-                      required: true,
-                      type: 'textarea',
-                    },
-                  ]
-                : [
-                    {
-                      key: 'type',
-                      label: 'Leave type',
-                      type: 'select',
-                      options: ['Annual', 'Sick', 'Unpaid'].map((v) => ({ value: v, label: v })),
-                    },
-                    { key: 'start', label: 'First day', type: 'date', required: true },
-                    { key: 'end', label: 'Last day', type: 'date', required: true },
-                    { key: 'reason', label: 'Note for your manager', type: 'textarea' },
-                  ]
+            form.kind === 'cancel'
+              ? [
+                  {
+                    key: 'reason',
+                    label: 'Reason for cancellation',
+                    required: true,
+                    type: 'textarea',
+                  },
+                ]
+              : [
+                  {
+                    key: 'type',
+                    label: 'Leave type',
+                    type: 'select',
+                    options: ['Annual', 'Sick', 'Unpaid', 'Special occasion'].map((v) => ({
+                      value: v,
+                      label: v,
+                    })),
+                  },
+                  { key: 'start', label: 'First day', type: 'date', required: true },
+                  { key: 'end', label: 'Last day', type: 'date', required: true },
+                  { key: 'reason', label: 'Note for your manager', type: 'textarea' },
+                ]
           }
           onSubmit={async (value) => {
             if (form.kind === 'cancel') await api(`/leave/${form.id}/cancel`, 'POST', value);
@@ -440,6 +432,7 @@ export function WorkCalendar({
       )}
       {weekly && data && (
         <Modal
+          wide
           title="Fill working week"
           description="Create separate entries for selected days. Existing entries remain; the whole batch is checked before saving."
           onClose={() => {
@@ -447,7 +440,7 @@ export function WorkCalendar({
           }}
         >
           <form
-            className="form-grid"
+            className="form-grid weekly-log-form"
             onSubmit={async (e) => {
               e.preventDefault();
               setBusy(true);
@@ -458,12 +451,13 @@ export function WorkCalendar({
                     date,
                     projectId: weekProject,
                     hours: Number(weekHours[date]),
+                    activity: weekActivity[date] || 'Work from office',
                     description,
                     billable: true,
                     status: submit ? 'Submitted' : 'Draft',
                   }));
                 if (!entries.length) throw Error('Enter hours for at least one day');
-                await api('/timesheets/batch', 'POST', { entries });
+                await api('/work-log/batch', 'POST', { entries });
                 await refresh();
                 setWeekly(false);
                 notify(`${entries.length} time entries saved`);
@@ -487,7 +481,6 @@ export function WorkCalendar({
             <label>
               Work description
               <textarea
-                required
                 maxLength={200}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -500,16 +493,25 @@ export function WorkCalendar({
                 return (
                   <label key={date}>
                     {niceDate(date)}
-                    <input
-                      aria-label={`Hours ${date}`}
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="0.25"
+                    <select
+                      aria-label={`Activity ${date}`}
+                      value={weekActivity[date] || 'Work from office'}
                       disabled={off}
-                      value={weekHours[date] || ''}
-                      placeholder={off ? 'Off' : '0'}
-                      onChange={(e) => setWeekHours({ ...weekHours, [date]: e.target.value })}
+                      onChange={(e) => {
+                        setWeekActivity({ ...weekActivity, [date]: e.target.value });
+                        if (isAbsence(e.target.value)) setWeekHours({ ...weekHours, [date]: '8' });
+                      }}
+                    >
+                      {activities.map((a) => (
+                        <option key={a}>{a}</option>
+                      ))}
+                    </select>
+                    <HoursStepper
+                      label={`Hours ${date}`}
+                      min={0}
+                      value={Number(weekHours[date] || 0)}
+                      disabled={off || isAbsence(weekActivity[date] || '')}
+                      onChange={(n) => setWeekHours({ ...weekHours, [date]: String(n) })}
                     />
                     <small>
                       {off

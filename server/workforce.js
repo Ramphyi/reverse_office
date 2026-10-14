@@ -195,6 +195,62 @@ export function initWorkforce(store) {
       }
       res.json({ userId, calendarId, organisation: org.name, days });
     });
+    app.post('/api/work-log/batch', (req, res) => {
+      const { entries } = z
+        .object({
+          entries: z
+            .array(
+              z.object({
+                date,
+                activity: z.enum([
+                  'Work from office',
+                  'Work from home',
+                  'Business trip',
+                  'Training',
+                  'Other work',
+                  'Paid vacation',
+                  'Special occasion',
+                  'Sick leave',
+                  'Unpaid leave',
+                ]),
+                hours: z.number().gt(0).max(24),
+                projectId: z.string().default(''),
+                description: z.string().max(200).default(''),
+                billable: z.boolean().default(true),
+                status: z.enum(['Draft', 'Submitted']).default('Draft'),
+              }),
+            )
+            .min(1)
+            .max(31),
+        })
+        .parse(req.body);
+      const leaveTypes = {
+        'Paid vacation': 'Annual',
+        'Special occasion': 'Special occasion',
+        'Sick leave': 'Sick',
+        'Unpaid leave': 'Unpaid',
+      };
+      const result = store.transaction(() =>
+        entries.map((entry) => {
+          const leaveType = leaveTypes[entry.activity];
+          const kind = leaveType ? 'leave' : 'timesheets';
+          const value = leaveType
+            ? schemas.leave.parse({
+                start: entry.date,
+                end: entry.date,
+                type: leaveType,
+                reason: entry.description,
+              })
+            : schemas.timesheets.parse({
+                ...entry,
+                description: entry.description.trim() || entry.activity,
+              });
+          validateRefs(kind, value, req.user);
+          return { ...store.put(kind, value, req.user.id), kind };
+        }),
+      );
+      res.status(201).json(result);
+    });
     app.post('/api/timesheets/batch', (req, res) => {
       const { entries } = z
         .object({ entries: z.array(schemas.timesheets).min(1).max(31) })

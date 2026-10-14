@@ -60,3 +60,14 @@ Screenshots are saved locally in ignored `artifacts/dashboard.png`, `artifacts/m
 External AI model output, external SMTP delivery, production certificate trust/revocation/timestamping, storage disaster recovery and ANAF test/live acceptance require environment-specific credentials and were not claimed as tested. The base branch does not contain billing. The Romania branch records its additional validation separately.
 
 The Vite build currently emits a large-bundle advisory for the combined editor bundle and non-fatal upstream comment annotations. These are recorded warnings, not build failures. Node 22 marks its SQLite module experimental; test coverage and pinned runtime requirements are included.
+
+
+## Productivity workflows — 2026-10-14
+
+The main branch passes the production TypeScript/Vite build, **71/71 backend tests** and **8/8 workspace browser scenarios**. The seven new backend cases cover activity/leave separation and atomicity, project/task authorization, Drive sharing and revocation, BCC-safe drafts and attachments, SMTP envelope/TLS/acceptance semantics, gateway signatures/deduplication, and uncertain SMTP failure with preserved local delivery. After retaining sharing versions when reverting to project access, all seven productivity cases were rerun successfully.
+
+The new browser scenario verifies 8-hour defaults and +/- controls, special-occasion requests, per-day weekly inputs, multiple project members, task drag/drop, named file downloads, draft persistence with attachments, internal delivery and replies between accounts. Desktop and 390px mobile dark-mode compose screenshots were inspected, alongside the wider weekly dialog. Existing workspace, WebRTC, AI, guest/chat and workforce scenarios also passed.
+
+SMTP uses an injected transport in automated tests; external relay delivery, provider authentication and inbound adapter deployment have **not** been verified with live credentials. This release adds the gateway contract, not IMAP synchronization or Microsoft/Google OAuth. See [productivity and mail setup](PRODUCTIVITY.md) for supported behavior and limits.
+
+No dependencies or distributed runtime components were added. The strict license gate remains blocked for the full company image. Functional validation and the isolated host development preview do not certify or redeploy that Docker distribution.

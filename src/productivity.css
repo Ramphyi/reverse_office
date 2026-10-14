@@ -1,0 +1,340 @@
+/* SPDX-License-Identifier: MIT */
+.padded-form,
+.time-entry-form,
+.weekly-log-form,
+.mail-compose {
+  padding: 24px 28px;
+}
+.time-entry-form,
+.mail-compose {
+  display: grid;
+  gap: 18px;
+}
+.time-entry-form label,
+.mail-compose label {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+}
+.time-entry-form input,
+.time-entry-form select,
+.time-entry-form textarea,
+.mail-compose input,
+.mail-compose textarea {
+  width: 100%;
+  min-width: 0;
+}
+.time-entry-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.time-hours {
+  background: var(--soft);
+  padding: 18px;
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+}
+.hours-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hours-stepper button {
+  width: 36px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--paper);
+  font-size: 23px;
+  flex-shrink: 0;
+}
+.hours-stepper input {
+  width: 68px;
+  min-width: 0;
+  text-align: center;
+  appearance: textfield;
+}
+.hours-stepper input::-webkit-inner-spin-button {
+  appearance: none;
+}
+.hour-presets,
+.time-entry-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.time-entry-actions {
+  justify-content: flex-end;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.time-entry-form .check-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.check-field input[type='checkbox'] {
+  width: 16px;
+  flex-shrink: 0;
+}
+.weekly-log-form .week-hours {
+  grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+  gap: 12px;
+}
+.weekly-log-form .week-hours > label {
+  background: var(--soft);
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  gap: 12px;
+}
+.week-hours select {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+.weekly-log-form .checkbox-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.weekly-log-form .checkbox-field input {
+  width: 16px;
+}
+[data-theme='dark'] .modal-footer,
+[data-theme='dark'] .form-actions {
+  background: var(--paper);
+  border-color: var(--border);
+}
+.modal {
+  max-height: 92dvh;
+  overflow-y: auto;
+}
+.multi-options {
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+}
+.multi-options label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+}
+.task-card[draggable='true'] {
+  cursor: grab;
+  transition: box-shadow 0.15s;
+}
+.task-card[draggable='true']:active {
+  cursor: grabbing;
+}
+.kanban-column:has(.task-card:active) {
+  outline: 2px dashed var(--border);
+}
+.task-key {
+  font-size: 10px;
+  color: var(--muted);
+}
+.sharing-people {
+  max-height: 320px;
+  overflow: auto;
+}
+.sharing-people > label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+.sharing-people small {
+  display: block;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.shared-drive {
+  padding: 24px;
+}
+.shared-file {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.mail-service-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.mail-workspace {
+  display: grid;
+  grid-template-columns: 140px 290px minmax(0, 1fr);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--paper);
+  min-height: 650px;
+  overflow: hidden;
+}
+.mail-workspace > nav {
+  padding: 16px 10px;
+  background: var(--soft);
+}
+.mail-workspace > nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px;
+  width: 100%;
+  text-align: left;
+  border-radius: 9px;
+}
+.mail-workspace > nav button.active {
+  background: var(--paper);
+  color: var(--green);
+  font-weight: 700;
+}
+.mail-messages {
+  border-right: 1px solid var(--border);
+  padding: 12px;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+.mail-messages > input {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.mail-messages > button {
+  width: 100%;
+  padding: 14px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  border-radius: 9px;
+}
+.mail-messages > button.selected {
+  background: var(--soft);
+}
+.mail-messages > button.unread {
+  border-left: 3px solid var(--green);
+}
+.mail-messages small {
+  font-size: 10px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.mail-messages p {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.mail-reader {
+  padding: 24px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mail-reader > p {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.mail-reader-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.mail-empty {
+  padding: 28px 10px;
+  color: var(--muted);
+}
+.mail-address-fields {
+  display: grid;
+  gap: 10px;
+}
+.mail-address-fields label {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  align-items: center;
+}
+.mail-compose-tools,
+.mail-file-list {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mail-file-list a,
+.mail-file-list > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 12px;
+}
+.mail-compose footer {
+  background: var(--paper);
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mail-compose footer > span {
+  flex: 1;
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 160px;
+}
+@media (max-width: 1100px) {
+  .mail-workspace {
+    grid-template-columns: 110px 230px minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .mail-workspace {
+    display: flex;
+    flex-direction: column;
+  }
+  .mail-workspace > nav {
+    display: flex;
+    overflow-x: auto;
+  }
+  .mail-workspace > nav button {
+    width: auto;
+    flex-shrink: 0;
+  }
+  .mail-messages {
+    max-height: 300px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .time-entry-row {
+    grid-template-columns: 1fr;
+  }
+  .padded-form,
+  .time-entry-form,
+  .weekly-log-form,
+  .mail-compose {
+    padding: 18px;
+  }
+  .weekly-log-form .week-hours {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-fields .multi-field {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}

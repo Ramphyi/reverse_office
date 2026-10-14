@@ -8,7 +8,7 @@ The full company application described below still has unresolved runtime/depend
 
 **Full company application release: blocked by the requested MIT/Apache-2.0-only license policy.** The current ONLYOFFICE, Node runtime, Debian image and several application dependencies do not meet that policy. The instructions below describe the previous, non-compliant implementation. Docker builds and the deployment script now stop at the license gate. The complete company suite has not yet been migrated; the standalone Studio above has a separate audited distribution. See [license status and migration blockers](docs/LICENSE-STATUS.md).
 
-See [floating assistant, local AI, OpenCode and navigation setup](docs/ASSISTANT.md).
+See [floating assistant, local AI, OpenCode and navigation setup](docs/ASSISTANT.md), and [time logging, project teams, Drive permissions and mail setup](docs/PRODUCTIVITY.md).
 
 A self-hosted company workspace with a consistent modern UI: writing, spreadsheets, presentations, files, PDF signing, chat, meetings, projects, timesheets, leave, company knowledge, mail and an accessible AI sidebar.
 
