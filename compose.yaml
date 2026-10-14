@@ -30,6 +30,10 @@ services:
       ANAF_REDIRECT_URI: ${ANAF_REDIRECT_URI:-}
       SPV_ENCRYPTION_KEY: ${SPV_ENCRYPTION_KEY:-}
       ANAF_ACCESS_TOKEN: ${ANAF_ACCESS_TOKEN:-}
+      OFFICE_PUBLIC_URL: ${OFFICE_PUBLIC_URL:-}
+      OFFICE_INTERNAL_URL: ${OFFICE_INTERNAL_URL:-http://documentserver}
+      OFFICE_APP_URL: ${OFFICE_APP_URL:-http://office:3001}
+      OFFICE_JWT_SECRET: ${OFFICE_JWT_SECRET:-}
     volumes:
       - office-data:/app/data
     read_only: true
@@ -39,6 +43,26 @@ services:
     security_opt: [no-new-privileges:true]
     mem_limit: 1g
     cpus: 2
+  documentserver:
+    image: onlyoffice/documentserver:10.0.0
+    profiles: [editors]
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8082:80'
+    environment:
+      JWT_ENABLED: 'true'
+      JWT_SECRET: ${OFFICE_JWT_SECRET:?Set a random OFFICE_JWT_SECRET in .env}
+      JWT_HEADER: AuthorizationJwt
+      JWT_IN_BODY: 'true'
+      ALLOW_PRIVATE_IP_ADDRESS: 'true'
+    volumes:
+      - editors-data:/var/www/onlyoffice/Data
+      - editors-logs:/var/log/onlyoffice
+      - editors-db:/var/lib/postgresql
+      - editors-cache:/var/lib/onlyoffice
+    shm_size: 256m
+    mem_limit: 4g
+    cpus: 4
   ollama:
     image: ollama/ollama:0.11.4
     profiles: [ai]
@@ -48,3 +72,7 @@ services:
 volumes:
   office-data:
   ollama-data:
+  editors-data:
+  editors-logs:
+  editors-db:
+  editors-cache:

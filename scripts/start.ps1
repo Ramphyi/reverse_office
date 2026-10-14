@@ -8,4 +8,8 @@ if (-not (Test-Path '.env')) {
 }
 if (-not (Test-Path 'node_modules')) { & npm install; if ($LASTEXITCODE) { exit $LASTEXITCODE } }
 if (-not (Test-Path 'dist')) { & npm run build; if ($LASTEXITCODE) { exit $LASTEXITCODE } }
+# The app runs on the host here, while the optional document engine runs in Docker.
+$env:OFFICE_INTERNAL_URL = 'http://localhost:8082'
+$env:OFFICE_APP_URL = 'http://host.docker.internal:3001'
+$env:HOST = '0.0.0.0'
 & node --env-file=.env server/index.js

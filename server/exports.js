@@ -232,6 +232,7 @@ export function checkZipLimits(buffer) {
   if (count > 2000 || offset >= buffer.length) throw Error('Archive is too large');
   let position = offset,
     total = 0;
+  const names = new Set();
   for (let i = 0; i < count; i++) {
     if (position + 46 > buffer.length || buffer.readUInt32LE(position) !== 0x02014b50)
       throw Error('Invalid ZIP directory');
@@ -240,10 +241,14 @@ export function checkZipLimits(buffer) {
     total += size;
     if (flags & 1 || size > 25 * 1024 * 1024 || total > 50 * 1024 * 1024)
       throw Error('Encrypted or oversized Office archive');
+    const nameLength = buffer.readUInt16LE(position + 28);
+    if (position + 46 + nameLength > buffer.length) throw Error('Invalid ZIP filename');
+    names.add(buffer.subarray(position + 46, position + 46 + nameLength).toString('utf8'));
     position +=
       46 +
       buffer.readUInt16LE(position + 28) +
       buffer.readUInt16LE(position + 30) +
       buffer.readUInt16LE(position + 32);
   }
+  return names;
 }

@@ -21,6 +21,8 @@
 ## in_scope
 - assets:
   - http://127.0.0.1:3001
+  - http://localhost:3102 (isolated native editor test app)
+  - http://localhost:8082 (owned local document engine)
   - D:\Coding\reverse_office\reverse_office
 - surfaces: []
 - activities: []

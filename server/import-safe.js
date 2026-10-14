@@ -1,8 +1,8 @@
 import { Worker } from 'node:worker_threads';
-export function safeImport(file) {
+export function safeImport(file, mode = 'import') {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./import-worker.js', import.meta.url), {
-      workerData: { originalname: file.originalname, buffer: file.buffer },
+      workerData: { originalname: file.originalname, buffer: file.buffer, mode },
       resourceLimits: { maxOldGenerationSizeMb: 192, maxYoungGenerationSizeMb: 32 },
     });
     let settled = false;

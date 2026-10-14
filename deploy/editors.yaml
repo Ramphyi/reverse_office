@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: editors-data
+  namespace: reverse-office
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: documentserver
+  namespace: reverse-office
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: documentserver
+  template:
+    metadata:
+      labels:
+        app: documentserver
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: documentserver
+          image: onlyoffice/documentserver:10.0.0
+          ports:
+            - containerPort: 80
+          env:
+            - name: JWT_ENABLED
+              value: 'true'
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: office-secrets
+                  key: OFFICE_JWT_SECRET
+            - name: JWT_HEADER
+              value: AuthorizationJwt
+            - name: JWT_IN_BODY
+              value: 'true'
+            - name: ALLOW_PRIVATE_IP_ADDRESS
+              value: 'true'
+          resources:
+            requests:
+              cpu: '1'
+              memory: 2Gi
+            limits:
+              cpu: '4'
+              memory: 4Gi
+          startupProbe:
+            httpGet: { path: /healthcheck, port: 80 }
+            failureThreshold: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /healthcheck, port: 80 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthcheck, port: 80 }
+            periodSeconds: 30
+            failureThreshold: 5
+          volumeMounts:
+            - { name: data, mountPath: /var/www/onlyoffice/Data, subPath: data }
+            - { name: data, mountPath: /var/lib/onlyoffice, subPath: cache }
+            - { name: data, mountPath: /var/lib/postgresql, subPath: postgres }
+            - { name: data, mountPath: /var/log/onlyoffice, subPath: logs }
+            - { name: shared-memory, mountPath: /dev/shm }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: editors-data }
+        - name: shared-memory
+          emptyDir: { medium: Memory, sizeLimit: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: documentserver
+  namespace: reverse-office
+spec:
+  selector: { app: documentserver }
+  ports:
+    - { port: 80, targetPort: 80 }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: documentserver
+  namespace: reverse-office
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [editors.example.com]
+      secretName: editors-tls
+  rules:
+    - host: editors.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: documentserver
+                port: { number: 80 }
