@@ -1,2 +1,10 @@
 public/studio/** text eol=lf
 studio-server/* text eol=lf
+scripts/*studio* text eol=lf
+src/StudioEditor.tsx text eol=lf
+tests/studio.test.js text eol=lf
+tests/studio-e2e/* text eol=lf
+playwright.studio.config.js text eol=lf
+compose.studio.yaml text eol=lf
+deploy/studio.yaml text eol=lf
+docs/STUDIO* text eol=lf
