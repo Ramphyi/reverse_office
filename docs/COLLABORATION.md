@@ -36,7 +36,8 @@ Messages bind uploaded files to the sender and conversation. Other participants
 cannot access a pending upload until it is sent. Downloads recheck current channel
 access and the message's attachment references. A different user, including an
 administrator who is not in a private conversation, cannot read its content/files
-through these APIs. Administrative audit metadata remains available according to
+through the ordinary chat APIs. Administrators have separate, audited review routes
+as described below. Administrative audit metadata remains available according to
 the existing audit policy. File types other than verified PNG/JPEG/GIF/WebP are
 download-only; filenames and claimed MIME types cannot enable executable previews.
 
@@ -96,3 +97,65 @@ coverage creates a managed account, transfers rich messages/GIFs/folders between
 accounts, accepts an audio call, checks remote video after enabling the camera, and
 verifies microphone preference persistence. Existing account, workforce, editor,
 meeting and SPV tests remain part of the regression suite.
+
+## Groups, channels and external companies
+
+Connect now has an original Discord-style navigation rail for all conversations,
+workspace channels, groups and direct messages, a search field and category headings.
+Use **New channel (+)** to create a workspace/project channel or an invitation-only
+**Group**. Workspace channels exclude external accounts. Groups support up to 100
+participants; calls retain the existing six-person limit.
+
+**Participants** adds/removes existing accounts. The conversation owner or an
+administrator manages a group. Adding people to a direct conversation creates a new
+group without copying the original direct-message history. People added to an
+existing group can read its history; the editor makes this explicit. The group
+owner cannot be removed. Changes use version checks and immediately revoke socket
+room membership as well as HTTP access for removed participants.
+
+In a group, **Invite external** creates a single-use, seven-day link bound to the
+recipient email and company label. Copy and deliver it to the intended person;
+no email is automatically sent. Treat the link like a temporary credential.
+Only its SHA-256 hash is stored. Pending invitations can be revoked. Accepting
+creates a guest account with a user-chosen password, without changing an existing
+account. If the email already has an account, add that account through Participants.
+Company names are directory labels, not a federation or tenant identity proof.
+
+Guests have a dedicated conversation/account interface. They can access only their
+explicit groups/direct conversations and associated calls/files. Their directory
+contains only fellow participants. Documents, projects, organisation settings,
+workforce, AI, billing and administrative endpoints are blocked. They can change
+passwords and preferred media devices. Administrators can disable a guest in People.
+To reach this server from another computer/company, deploy it behind HTTPS on an
+accessible address; localhost invitation links work only on this computer. This
+feature does not connect separate Reverse Office servers into a federated network.
+
+## Administrator conversation review
+
+Connect's **Audit** button opens **Conversation review** for administrators only.
+Select any conversation, enter a reason of at least 10 characters and open the
+read-only transcript. Both opening the transcript and downloading a published
+attachment record the actor, target and reason in the append-only audit log.
+Pending, unsent uploads are excluded. Review does not join calls or grant ordinary
+chat membership, and does not expose private content to AI context endpoints.
+
+All chat screens display the administrator-review notice. External account
+registration requires acknowledgment. Existing stored direct conversations are
+also subject to the explicit administrative review feature. This is not an
+end-to-end encrypted private messenger.
+
+## Microsoft Teams and Google Meet links
+
+**Teams / Meet** stores a validated HTTPS meeting link as a chat card. **Join** opens
+the real provider site in a new tab; credentials, chat files and local session
+cookies are not sent to the provider. The application neither embeds the provider
+call nor impersonates a Microsoft/Google account. It does not create meetings in
+those providers, exchange identity tokens or bridge media to native Reverse Office
+calls. Actual admission depends on the provider and meeting host.
+
+Microsoft documents [joining without a Teams account](https://support.microsoft.com/en-gb/teams/meetings/join-a-meeting-without-an-account-in-microsoft-teams).
+Google documents [joining a Meet meeting](https://support.google.com/meet/answer/9303069?hl=en).
+The local account is usable for Reverse Office calls; it does not become an account
+accepted by either external identity provider. Automated tests verify link
+validation, authorized sharing and the new-tab destination, not admission to a
+live external meeting.

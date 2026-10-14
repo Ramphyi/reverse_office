@@ -96,8 +96,9 @@ export const schemas = {
     title: text,
     projectId,
     description: z.string().max(1000).default(''),
-    visibility: z.enum(['workspace', 'direct']).default('workspace'),
-    memberIds: z.array(z.string().max(100)).max(2).default([]),
+    visibility: z.enum(['workspace', 'direct', 'group']).default('workspace'),
+    memberIds: z.array(z.string().max(100)).max(100).default([]),
+    category: z.string().trim().max(80).default('General'),
   }),
   messages: z
     .object({

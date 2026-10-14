@@ -2,7 +2,9 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { existsSync } from 'node:fs';
 import { createApp } from './app.js';
-const { app, store, setupKey, session, readable } = createApp();
+const { app, store, setupKey, session, readable } = createApp({
+  test: process.env.NODE_ENV === 'test',
+});
 if (existsSync(new URL('./romania.js', import.meta.url)))
   (await import('./romania.js')).installRomania(app);
 app.locals.installFinalHandlers();

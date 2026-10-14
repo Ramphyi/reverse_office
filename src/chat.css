@@ -259,3 +259,267 @@
     max-width: min(240px, 55vw);
   }
 }
+
+/* Original MIT conversation navigation and guest collaboration UI. */
+.discord-chat {
+  grid-template-columns: 64px 235px minmax(0, 1fr);
+}
+.chat-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 6px;
+  background: var(--soft);
+  border-right: 1px solid var(--border);
+}
+.chat-rail button {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  transition:
+    border-radius 0.18s,
+    background 0.18s,
+    transform 0.18s;
+}
+.chat-rail button:hover {
+  transform: translateY(-2px);
+  border-radius: 12px;
+}
+.chat-rail button.active {
+  background: #6554a4;
+  color: white;
+  box-shadow: 0 5px 15px #6554a433;
+}
+.conversation-filter {
+  width: 100%;
+  margin: 8px 0;
+}
+.channel-category {
+  margin: 14px 0;
+}
+.channel-category h4 {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 8px;
+  opacity: 0.7;
+}
+.channel-category button {
+  width: 100%;
+  text-align: left;
+}
+.channel-category button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.discord-chat .conversation > header {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.discord-chat .conversation > header > div:first-of-type {
+  flex: 1;
+  min-width: 130px;
+}
+.discord-chat .conversation > header h3 {
+  overflow-wrap: anywhere;
+}
+.discord-chat .conversation > header p {
+  max-height: 36px;
+  overflow: hidden;
+}
+.chat-policy {
+  padding: 9px 16px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted, #687774);
+  background: var(--soft);
+  border-bottom: 1px solid var(--border);
+}
+.space-form {
+  display: grid;
+  gap: 16px;
+}
+.space-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+}
+.space-form p {
+  line-height: 1.6;
+  font-size: 13px;
+}
+.space-form input,
+.space-form select,
+.space-form textarea {
+  width: 100%;
+  min-width: 0;
+}
+.participant-picker > div {
+  max-height: 250px;
+  overflow: auto;
+  padding: 8px 0;
+}
+.participant-picker label,
+.space-form .acknowledge {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 9px;
+}
+.participant-picker input[type='checkbox'],
+.space-form .acknowledge input {
+  width: 16px;
+  flex-shrink: 0;
+}
+.participant-picker small,
+.invitation-list small,
+.external-meeting-card small {
+  display: block;
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+.invitation-list {
+  margin-top: 24px;
+  max-height: 230px;
+  overflow: auto;
+}
+.invitation-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.external-meeting-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 10px 0;
+  text-decoration: none;
+  color: inherit;
+  background: var(--soft);
+}
+.review-messages {
+  max-height: 48vh;
+  overflow: auto;
+  margin-top: 20px;
+}
+.review-messages article {
+  border-top: 1px solid var(--border);
+  padding: 18px 8px;
+}
+.review-messages small {
+  margin-left: 10px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.guest-join {
+  max-width: 540px;
+  padding: 40px 24px;
+  margin: 6vh auto;
+}
+.guest-join > p {
+  margin: 18px 0;
+  line-height: 1.6;
+}
+.guest-workspace {
+  padding: 20px;
+}
+.guest-workspace > header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.guest-workspace > header > span {
+  flex: 1;
+}
+.guest-workspace .rich-chat {
+  height: calc(100dvh - 110px);
+  max-height: none;
+}
+@media (max-width: 1000px) {
+  .discord-chat {
+    grid-template-columns: 52px 190px minmax(0, 1fr);
+  }
+  .chat-rail button {
+    width: 38px;
+    height: 38px;
+    font-size: 10px;
+  }
+}
+@media (max-width: 700px) {
+  .discord-chat {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+  }
+  .chat-rail {
+    flex-direction: row;
+    padding: 8px;
+  }
+  .discord-chat .channels {
+    max-height: 210px;
+    width: 100%;
+  }
+  .discord-chat .conversation {
+    min-height: 650px;
+  }
+  .guest-workspace {
+    padding: 8px;
+  }
+  .guest-workspace .rich-chat {
+    height: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-rail button {
+    transition: none;
+  }
+}
+
+.channel-category button {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 10px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.channel-category button.active {
+  color: var(--green);
+  background: var(--soft);
+  font-weight: 700;
+}
+@media (max-width: 700px) {
+  .discord-chat {
+    height: auto;
+    min-height: 0;
+  }
+  .discord-chat > .chat-rail,
+  .discord-chat > .channels,
+  .discord-chat > .conversation {
+    flex-shrink: 0;
+  }
+  .discord-chat .channels {
+    min-height: 180px;
+  }
+  .discord-chat .conversation {
+    min-height: 650px;
+  }
+}

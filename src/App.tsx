@@ -1,3 +1,4 @@
+import { GuestInvitation } from './ChatSpaces';
 import { Account } from './Account';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -147,6 +148,9 @@ const subtitles: Record<string, string> = {
   chat: 'Good things happen when we connect.',
 };
 export default function App() {
+  const [inviteToken, setInviteToken] = useState(
+    () => new URLSearchParams(location.hash.slice(1)).get('invite') || '',
+  );
   const [previewMode, setPreviewMode] = useState(false);
   useEffect(() => {
     api('/health')
@@ -188,8 +192,8 @@ export default function App() {
     const [data, people, services, org] = await Promise.all([
       api('/state'),
       api('/users'),
-      api('/integrations'),
-      api('/organisation'),
+      auth?.user.role === 'guest' ? Promise.resolve({}) : api('/integrations'),
+      auth?.user.role === 'guest' ? Promise.resolve({}) : api('/organisation'),
     ]);
     setState(data);
     setUsers(people);
@@ -240,6 +244,23 @@ export default function App() {
         <LoaderCircle className="spin" />
       </div>
     );
+  if (inviteToken)
+    return (
+      <GuestInvitation
+        token={inviteToken}
+        onCancel={() => {
+          history.replaceState(null, '', location.pathname);
+          setInviteToken('');
+        }}
+        onLogin={(a) => {
+          history.replaceState(null, '', location.pathname);
+          setInviteToken('');
+          setCsrf(a.csrf);
+          setAuth(a);
+          setSetup(false);
+        }}
+      />
+    );
   if (!auth)
     return (
       <Login
@@ -264,6 +285,51 @@ export default function App() {
     return (
       <main className="forced-account">
         <Account user={user} onChanged={accountChanged} onLogout={() => setAuth(null)} />
+      </main>
+    );
+  if (user.role === 'guest')
+    return (
+      <main className="guest-workspace">
+        <header>
+          <strong>reverseoffice · External workspace</strong>
+          <span>
+            {user.name} · {user.company}
+          </span>
+          <ThemePicker value={choice} onChange={setChoice} />
+          <button
+            className="button"
+            onClick={() => setPage(page === 'account' ? 'chat' : 'account')}
+          >
+            {page === 'account' ? 'Conversations' : 'My account'}
+          </button>
+          <button
+            className="button"
+            onClick={async () => {
+              await api('/logout', 'POST');
+              setAuth(null);
+            }}
+          >
+            Sign out
+          </button>
+        </header>
+        {page === 'account' ? (
+          <Account user={user} onChanged={accountChanged} onLogout={() => setAuth(null)} />
+        ) : (
+          <Chat
+            state={state}
+            user={user}
+            users={users}
+            refresh={refresh}
+            notify={notify}
+            projectOptions={[{ value: '', label: 'Workspace' }]}
+          />
+        )}
+        <CallNotifications user={user} notify={notify} />
+        {toast && (
+          <div className="toast" role="status">
+            {toast}
+          </div>
+        )}
       </main>
     );
   const navigate = (id: string) => {

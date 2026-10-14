@@ -288,3 +288,294 @@ test('caller can end a call idempotently and custom session cookies isolate logo
   assert.equal((await request('/logout', { who: outsider, method: 'POST', body: {} })).status, 200);
   assert.equal((await request('/me', { who: outsider })).status, 401);
 });
+
+let group, guest;
+test('groups isolate membership, preserve old DMs and enforce owner/version changes', async () => {
+  const result = await request('/chat/' + conversation.id + '/expand', {
+    who: member,
+    method: 'POST',
+    body: { title: 'Partner project', memberIds: [admin.user.id] },
+  });
+  assert.equal(result.status, 201);
+  group = result.data;
+  assert.equal(group.visibility, 'group');
+  assert.ok(!runtime.store.all('messages').some((m) => m.channelId === group.id));
+  assert.equal(
+    (
+      await request('/entities/channels/' + group.id, {
+        who: member,
+        method: 'PUT',
+        body: { ...group, visibility: 'workspace' },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request('/chat/' + group.id + '/members', {
+        who: boss,
+        method: 'PUT',
+        body: { memberIds: group.memberIds, version: group.version },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request('/chat/' + group.id + '/members', {
+        who: member,
+        method: 'PUT',
+        body: { memberIds: [boss.user.id], version: group.version },
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request('/chat/' + group.id + '/members', {
+        who: member,
+        method: 'PUT',
+        body: { memberIds: group.memberIds, version: 999 },
+      })
+    ).status,
+    409,
+  );
+  const workspace = await request('/chat/conversations', {
+    method: 'POST',
+    body: { title: 'Design channel', visibility: 'workspace', category: 'Design' },
+  });
+  assert.equal(workspace.status, 201);
+  assert.equal(workspace.data.category, 'Design');
+});
+
+test('external invitations are single-use, revocable, expiring and grant chat-only accounts', async () => {
+  const invite = await request('/chat/' + group.id + '/invitations', {
+    who: member,
+    method: 'POST',
+    body: { email: 'guest@partner.test', company: 'Partner Inc' },
+  });
+  assert.equal(invite.status, 201);
+  assert.ok(!JSON.stringify(runtime.store.all('chatInvites')).includes(invite.data.token));
+  const body = { token: invite.data.token, name: 'External Guest', password, acknowledge: true };
+  assert.equal(
+    (
+      await request('/chat-invitations/accept', {
+        who: null,
+        method: 'POST',
+        body: { ...body, acknowledge: false },
+      })
+    ).status,
+    400,
+  );
+  const accepted = await request('/chat-invitations/accept', { who: null, method: 'POST', body });
+  assert.equal(accepted.status, 201);
+  guest = { ...accepted.data, cookie: accepted.response.headers.get('set-cookie').split(';')[0] };
+  assert.equal(guest.user.role, 'guest');
+  assert.equal(guest.user.company, 'Partner Inc');
+  assert.equal(
+    (await request('/chat-invitations/accept', { who: null, method: 'POST', body })).status,
+    400,
+  );
+  const state = (await request('/state', { who: guest })).data;
+  assert.deepEqual(
+    state.channels.map((c) => c.id),
+    [group.id],
+  );
+  for (const kind of ['projects', 'documents', 'timesheets', 'leave', 'calendars', 'files'])
+    assert.equal(state[kind].length, 0);
+  const people = (await request('/users', { who: guest })).data;
+  assert.ok(people.some((u) => u.id === member.user.id));
+  assert.ok(!people.some((u) => u.id === outsider.user.id));
+  for (const url of [
+    '/organisation',
+    '/audit',
+    '/ai/settings',
+    '/entities/documents',
+    '/chat/admin/conversations',
+  ])
+    assert.equal((await request(url, { who: guest })).status, 403, url);
+  assert.equal(
+    (
+      await request('/chat/direct', {
+        who: guest,
+        method: 'POST',
+        body: { userId: outsider.user.id },
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request('/chat/conversations', {
+        who: guest,
+        method: 'POST',
+        body: { title: 'Escape', visibility: 'workspace' },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request('/chat/' + group.id + '/invitations', {
+        who: guest,
+        method: 'POST',
+        body: { email: 'escape@test.com', company: 'X' },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request('/entities/messages', {
+        who: guest,
+        method: 'POST',
+        body: { channelId: group.id, text: 'Hello from Partner Inc' },
+      })
+    ).status,
+    201,
+  );
+  const call = await request('/chat/' + group.id + '/call', {
+    who: guest,
+    method: 'POST',
+    body: { mode: 'audio' },
+  });
+  assert.equal(call.status, 201);
+  assert.equal((await request('/rtc-config', { who: guest })).status, 200);
+  const current = runtime.store.get('channels', group.id);
+  const removed = await request('/chat/' + group.id + '/members', {
+    who: member,
+    method: 'PUT',
+    body: {
+      memberIds: current.memberIds.filter((id) => id !== guest.user.id),
+      version: current.version,
+    },
+  });
+  assert.equal(removed.status, 200);
+  assert.equal((await request('/chat/' + group.id + '/attachments', { who: guest })).status, 403);
+  assert.equal((await request('/entities/events', { who: guest })).data.length, 0);
+  assert.equal(
+    (
+      await request('/entities/messages', {
+        who: guest,
+        method: 'POST',
+        body: { channelId: group.id, text: 'Removed user' },
+      })
+    ).status,
+    403,
+  );
+  for (const mode of ['revoked', 'expired']) {
+    const v = await request('/chat/' + group.id + '/invitations', {
+      who: member,
+      method: 'POST',
+      body: { email: mode + '@partner.test', company: 'Partner' },
+    });
+    assert.equal(v.status, 201);
+    if (mode === 'revoked')
+      assert.equal(
+        (
+          await request('/chat/' + group.id + '/invitations/' + v.data.id, {
+            who: member,
+            method: 'DELETE',
+          })
+        ).status,
+        200,
+      );
+    else {
+      const i = runtime.store.get('chatInvites', v.data.id);
+      runtime.store.put(
+        'chatInvites',
+        { ...i, expires: '2000-01-01T00:00:00Z' },
+        member.user.id,
+        i.id,
+        i.version,
+      );
+    }
+    assert.equal(
+      (
+        await request('/chat-invitations/accept', {
+          who: null,
+          method: 'POST',
+          body: { ...body, token: v.data.token },
+        })
+      ).status,
+      400,
+    );
+  }
+  assert.equal(
+    (
+      await request('/users/' + guest.user.id, {
+        method: 'PATCH',
+        body: { active: false, role: 'guest' },
+      })
+    ).status,
+    200,
+  );
+  assert.equal((await request('/me', { who: guest })).status, 401);
+});
+
+test('administrators review private messages through reasoned audited routes only', async () => {
+  assert.equal((await request('/chat/admin/conversations', { who: member })).status, 403);
+  assert.equal((await request('/chat/admin/conversations')).status, 200);
+  const route = '/chat/admin/' + conversation.id + '/review';
+  assert.equal((await request(route, { method: 'POST', body: { reason: 'short' } })).status, 400);
+  const reviewed = await request(route, {
+    method: 'POST',
+    body: { reason: 'Review a reported incident' },
+  });
+  assert.equal(reviewed.status, 200);
+  assert.ok(reviewed.data.messages.some((m) => m.text.includes('Source')));
+  const a = reviewed.data.attachments[0];
+  assert.ok(a);
+  assert.equal((await request('/chat/attachments/' + a.id + '/download')).status, 403);
+  assert.equal(
+    (
+      await request(
+        '/chat/admin/attachments/' + a.id + '/download?reason=Investigating%20reported%20file',
+        { raw: true },
+      )
+    ).status,
+    200,
+  );
+  const audits = runtime.store.db
+    .prepare("SELECT action,detail FROM audit WHERE actor=? AND action LIKE 'chat.review.%'")
+    .all(admin.user.id);
+  assert.ok(
+    audits.some(
+      (a) =>
+        a.action === 'chat.review.read' &&
+        JSON.parse(a.detail).reason === 'Review a reported incident',
+    ),
+  );
+  assert.ok(audits.some((a) => a.action === 'chat.review.download'));
+});
+
+test('external meeting cards allow only provider meeting URLs and never authenticate as the provider', async () => {
+  const url = '/chat/' + group.id + '/external-meeting';
+  for (const link of [
+    'javascript:alert(1)',
+    'https://meet.google.com.evil.test/abc-defg-hij',
+    'https://meet.google.com@evil.test/abc-defg-hij',
+    'http://meet.google.com/abc-defg-hij',
+    'https://teams.microsoft.com/evil',
+    'https://meet.google.com:8443/abc-defg-hij',
+  ])
+    assert.equal(
+      (await request(url, { who: member, method: 'POST', body: { title: 'Meeting', url: link } }))
+        .status,
+      400,
+      link,
+    );
+  for (const link of [
+    'https://meet.google.com/abc-defg-hij',
+    'https://teams.microsoft.com/l/meetup-join/test?context=x',
+  ]) {
+    const result = await request(url, {
+      who: member,
+      method: 'POST',
+      body: { title: 'Client meeting', url: link },
+    });
+    assert.equal(result.status, 201);
+    assert.equal(result.data.externalMeeting.url, link);
+    assert.ok(['Google Meet', 'Microsoft Teams'].includes(result.data.externalMeeting.provider));
+  }
+});

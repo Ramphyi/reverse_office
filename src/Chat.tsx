@@ -1,3 +1,10 @@
+import {
+  ConversationEditor,
+  InviteGuest,
+  ExternalMeeting,
+  ChatReview,
+  chatNotice,
+} from './ChatSpaces';
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import Markdown from 'react-markdown';
@@ -15,7 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { api, save, getCsrf, initials, type State, type User, type Item } from './api';
-import { Empty, FormModal } from './components';
+import { Empty } from './components';
 import { MeetingRoom } from './Collaboration';
 const emojis = [
   '😀',
@@ -76,7 +83,13 @@ export function Chat({
   notify: (t: string) => void;
   projectOptions: { value: string; label: string }[];
 }) {
-  const [channel, setChannel] = useState(state.channels?.[0]?.id ?? ''),
+  const [manage, setManage] = useState(false),
+    [invite, setInvite] = useState(false),
+    [external, setExternal] = useState(false),
+    [review, setReview] = useState(false),
+    [scope, setScope] = useState('all'),
+    [filter, setFilter] = useState('');
+  const [channel, setChannel] = useState<string>(state.channels?.[0]?.id ?? ''),
     [messages, setMessages] = useState<Item[]>(state.messages ?? []),
     [channels, setChannels] = useState<Item[]>(state.channels ?? []),
     [attachments, setAttachments] = useState<Item[]>([]),
@@ -99,6 +112,9 @@ export function Chat({
   useEffect(() => {
     setChannels(state.channels ?? []);
     setMessages(state.messages ?? []);
+    setChannel((id) =>
+      (state.channels || []).some((c) => c.id === id) ? id : state.channels?.[0]?.id || '',
+    );
   }, [state]);
   useEffect(() => {
     folder.current?.setAttribute('webkitdirectory', '');
@@ -111,12 +127,11 @@ export function Chat({
     }
   }
   useEffect(() => {
-    if (!channel) return;
     let live = true;
     setAttachments([]);
     setPending([]);
     setText('');
-    loadAttachments(channel).catch((e) => notify(e.message));
+    if (channel) loadAttachments(channel).catch((e) => notify(e.message));
     const socket = io({ auth: { csrf: getCsrf() } });
     socket.on('connect', () => {
       if (!live) return;
@@ -137,7 +152,16 @@ export function Chat({
     socket.on('chat:updated', () => {
       api('/entities/channels')
         .then((data) => {
-          if (live) setChannels(data);
+          if (live) {
+            setChannels(data);
+            if (!data.some((c: Item) => c.id === currentId.current)) {
+              setChannel(data[0]?.id || '');
+              setMessages([]);
+              setAttachments([]);
+              setPending([]);
+            }
+            refresh().catch((e) => notify(e.message));
+          }
         })
         .catch((e) => notify(e.message));
     });
@@ -246,19 +270,82 @@ export function Chat({
       notify((e as Error).message);
     }
   }
+  async function savedConversation(c: Item) {
+    await refresh();
+    setChannels((cs) => [...cs.filter((v) => v.id !== c.id), c]);
+    setChannel(c.id);
+  }
+  const canManage =
+    user.role !== 'guest' && current && (current.owner === user.id || user.role === 'admin');
+  const filtered = channels.filter(
+    (c) =>
+      (scope === 'all' ||
+        (scope === 'direct'
+          ? c.visibility === 'direct'
+          : scope === 'group'
+            ? c.visibility === 'group'
+            : !['direct', 'group'].includes(c.visibility))) &&
+      title(c).toLowerCase().includes(filter.toLowerCase()),
+  );
+  const categories = [
+    ...new Set(
+      filtered.map((c) =>
+        c.visibility === 'direct'
+          ? 'Direct messages'
+          : c.visibility === 'group'
+            ? 'Groups · ' + (c.category || 'General')
+            : c.category || 'General',
+      ),
+    ),
+  ];
   return (
-    <div className="chat-layout rich-chat">
+    <div className="chat-layout rich-chat discord-chat">
+      <nav className="chat-rail" aria-label="Conversation categories">
+        {[
+          ['all', 'All'],
+          ['workspace', '#'],
+          ['group', 'Groups'],
+          ['direct', 'DM'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            title={label}
+            aria-label={'Show ' + id + ' conversations'}
+            className={scope === id ? 'active' : ''}
+            onClick={() => setScope(id)}
+          >
+            {label}
+          </button>
+        ))}
+        {user.role === 'admin' && (
+          <button
+            aria-label="Review conversations"
+            title="Administrator review"
+            onClick={() => setReview(true)}
+          >
+            Audit
+          </button>
+        )}
+      </nav>
       <aside className="channels">
         <div>
           <strong>Conversations</strong>
           <button
             className="icon-button"
             aria-label="New channel"
+            disabled={user.role === 'guest'}
             onClick={() => setNewChannel(true)}
           >
             <Plus size={17} />
           </button>
         </div>
+        <input
+          className="conversation-filter"
+          aria-label="Filter conversations"
+          placeholder="Find a conversation…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
         <label className="chat-person-picker">
           New private chat
           <select
@@ -273,6 +360,7 @@ export function Chat({
               .map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
+                  {u.company ? ` · ${u.company} (external)` : ''}
                   {u.id === user.managerId
                     ? ' · Your manager'
                     : u.managerId === user.id
@@ -288,16 +376,30 @@ export function Chat({
             Chat with my manager
           </button>
         )}
-        {channels.map((c) => (
-          <button
-            disabled={uploading || busy}
-            className={channel === c.id ? 'active' : ''}
-            key={c.id}
-            onClick={() => setChannel(c.id)}
-          >
-            {c.visibility === 'direct' ? <MessageCircle size={18} /> : <Hash size={18} />}
-            <span>{title(c)}</span>
-          </button>
+        {categories.map((category) => (
+          <section className="channel-category" key={category}>
+            <h4>{category}</h4>
+            {filtered
+              .filter(
+                (c) =>
+                  (c.visibility === 'direct'
+                    ? 'Direct messages'
+                    : c.visibility === 'group'
+                      ? 'Groups · ' + (c.category || 'General')
+                      : c.category || 'General') === category,
+              )
+              .map((c) => (
+                <button
+                  disabled={uploading || busy}
+                  className={channel === c.id ? 'active' : ''}
+                  key={c.id}
+                  onClick={() => setChannel(c.id)}
+                >
+                  {c.visibility === 'direct' ? <MessageCircle size={18} /> : <Hash size={18} />}
+                  <span>{title(c)}</span>
+                </button>
+              ))}
+          </section>
         ))}
         <footer>
           <span className={`online-dot ${connected ? '' : 'offline'}`} />
@@ -309,9 +411,28 @@ export function Chat({
           <MessageCircle size={22} />
           <div>
             <h3>{title(current)}</h3>
-            <p>{current?.description || 'Messages, ideas and files in one place.'}</p>
+            <p>
+              {current?.visibility === 'direct'
+                ? 'Direct conversation · Two participants'
+                : current?.description || 'Messages, ideas and files in one place.'}
+            </p>
           </div>
           <div className="grow" />
+          {current &&
+            user.role !== 'guest' &&
+            (current.visibility === 'direct' || (current.visibility === 'group' && canManage)) && (
+              <button className="button" onClick={() => setManage(true)}>
+                Participants
+              </button>
+            )}
+          {current?.visibility === 'group' && canManage && (
+            <button className="button" onClick={() => setInvite(true)}>
+              Invite external
+            </button>
+          )}
+          <button className="button" disabled={!channel} onClick={() => setExternal(true)}>
+            Teams / Meet
+          </button>
           <button
             className="icon-button"
             aria-label="Start audio call"
@@ -329,6 +450,12 @@ export function Chat({
             <Video size={20} />
           </button>
         </header>
+        <div className="chat-policy">
+          {chatNotice}
+          {current?.visibility === 'group' && (
+            <span> · {current.memberIds.length} participants</span>
+          )}
+        </div>
         <div className="message-list">
           {!list.length && (
             <Empty
@@ -354,6 +481,22 @@ export function Chat({
                 <div className="chat-markdown">
                   <RichText text={m.text} />
                 </div>
+                {m.externalMeeting && (
+                  <a
+                    className="external-meeting-card"
+                    href={m.externalMeeting.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Video size={20} />
+                    <span>
+                      Join {m.externalMeeting.provider}
+                      <small>
+                        Opens in a new tab · host admission or provider sign-in may be required
+                      </small>
+                    </span>
+                  </a>
+                )}
                 {!!m.callId && (
                   <button
                     className="button"
@@ -576,31 +719,28 @@ export function Chat({
           </div>
         </form>
       </section>
-      {newChannel && (
-        <FormModal
-          title="Create a channel"
-          onClose={() => setNewChannel(false)}
-          fields={[
-            { key: 'title', label: 'Channel name', required: true },
-            { key: 'description', label: 'What is this channel for?', type: 'textarea' },
-            {
-              key: 'projectId',
-              label: 'Access',
-              type: 'select',
-              options: projectOptions.map((p) =>
-                p.value ? p : { value: '', label: 'Everyone in the workspace' },
-              ),
-            },
-          ]}
-          onSubmit={async (data) => {
-            const c = await save('channels', data);
-            await refresh();
-            setChannels((cs) => [...cs.filter((v) => v.id !== c.id), c]);
-            setChannel(c.id);
-            notify('Channel created');
+      {(newChannel || manage) && (
+        <ConversationEditor
+          current={manage ? current : undefined}
+          users={users}
+          user={user}
+          projectOptions={projectOptions}
+          onClose={() => {
+            setNewChannel(false);
+            setManage(false);
           }}
+          onSaved={savedConversation}
         />
       )}
+      {invite && current && <InviteGuest channel={current} onClose={() => setInvite(false)} />}
+      {external && (
+        <ExternalMeeting
+          channelId={channel}
+          onClose={() => setExternal(false)}
+          onSaved={(m) => setMessages((ms) => (ms.some((v) => v.id === m.id) ? ms : [...ms, m]))}
+        />
+      )}
+      {review && <ChatReview users={users} onClose={() => setReview(false)} />}
       {meeting && (
         <MeetingRoom
           meeting={meeting}

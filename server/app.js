@@ -1,3 +1,4 @@
+import { installChatInvites, chatDirectory } from './chat-spaces.js';
 import { installChat } from './chat.js';
 import { createAISettings, installAISettings } from './ai-settings.js';
 import express from 'express';
@@ -42,6 +43,7 @@ const publicUser = (u) => ({
   jobTitle: u.job_title || '',
   calendarId: u.calendar_id || '',
   managerId: u.manager_id || '',
+  company: u.company || '',
 });
 const cookie = (req) =>
   Object.fromEntries((req.headers.cookie ?? '').split(';').map((v) => v.trim().split('=')));
@@ -97,7 +99,13 @@ export function createApp({
     );
   const loginLimit = test
     ? (req, res, next) => next()
-    : rateLimit({ windowMs: 900000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false });
+    : rateLimit({
+        windowMs: 900000,
+        limit: 20,
+        standardHeaders: 'draft-8',
+        legacyHeaders: false,
+        message: { error: 'Too many sign-in attempts. Try again later.' },
+      });
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 25 * 1024 * 1024, files: 1 },
@@ -154,6 +162,7 @@ export function createApp({
     store.audit(user.id, 'login', 'session');
     res.json(signIn(res, user));
   });
+  installChatInvites(app, { store, fail, signIn, loginLimit });
   app.use('/api', (req, res, next) => {
     const user = session(req);
     if (!user) return res.status(401).json({ error: 'Sign in to continue' });
@@ -178,6 +187,26 @@ export function createApp({
         error: 'Change your temporary password before accessing the workspace',
         code: 'PASSWORD_CHANGE_REQUIRED',
       });
+    if (user.role === 'guest') {
+      const read =
+        req.method === 'GET' &&
+        [
+          '/me',
+          '/state',
+          '/users',
+          '/entities/channels',
+          '/entities/messages',
+          '/entities/events',
+          '/rtc-config',
+        ].includes(req.path);
+      const self = ['/password', '/logout', '/profile'].includes(req.path);
+      const chat = req.path.startsWith('/chat/') && !req.path.startsWith('/chat/admin/');
+      const message = /^\/entities\/messages(?:\/[^/]+)?$/.test(req.path);
+      if (!read && !self && !chat && !message)
+        return res.status(403).json({
+          error: 'External accounts can only access their conversations and account settings',
+        });
+    }
     next();
   });
   app.get('/api/me', (req, res) => res.json({ user: publicUser(req.user), csrf: req.user.csrf }));
@@ -210,6 +239,15 @@ export function createApp({
   };
   function readable(user, kind, item) {
     if (!item) return false;
+    if (user.role === 'guest') {
+      if (kind === 'channels')
+        return ['group', 'direct'].includes(item.visibility) && item.memberIds?.includes(user.id);
+      if (kind === 'messages')
+        return readable(user, 'channels', store.get('channels', item.channelId));
+      if (kind === 'events')
+        return item.call && readable(user, 'channels', store.get('channels', item.channelId));
+      return false;
+    }
     if (kind === 'mail') return item.owner === user.id || item.recipientId === user.id;
     if (['timesheets', 'leave', 'entitlements'].includes(kind))
       return manager(user) || item.userId === user.id || item.owner === user.id;
@@ -217,7 +255,7 @@ export function createApp({
     if (kind === 'projects') return hasProject(user, item.id);
     if (kind === 'messages')
       return readable(user, 'channels', store.get('channels', item.channelId));
-    if (kind === 'channels' && item.visibility === 'direct')
+    if (kind === 'channels' && ['direct', 'group'].includes(item.visibility))
       return item.memberIds?.includes(user.id);
     if (
       kind === 'events' &&
@@ -237,7 +275,10 @@ export function createApp({
   }
   function writable(user, kind, item) {
     if (!readable(user, kind, item)) return false;
-    if ((kind === 'events' && item.call) || (kind === 'channels' && item.visibility === 'direct'))
+    if (
+      (kind === 'events' && item.call) ||
+      (kind === 'channels' && ['direct', 'group'].includes(item.visibility))
+    )
       return false;
     if (kind === 'messages') return item.owner === user.id;
     if (['projects', 'calendars', 'entitlements'].includes(kind)) return manager(user);
@@ -267,7 +308,11 @@ export function createApp({
       fail(403, 'You do not have access to this project');
   }
   function validateRefs(kind, data, user, old) {
-    if (kind === 'channels' && (data.visibility === 'direct' || old?.visibility === 'direct'))
+    if (
+      kind === 'channels' &&
+      (['direct', 'group'].includes(data.visibility) ||
+        ['direct', 'group'].includes(old?.visibility))
+    )
       fail(400, 'Use private conversation creation');
     if (kind === 'messages') chat.validateMessage(data, user, old);
     ensureProject(user, data);
@@ -394,7 +439,7 @@ export function createApp({
   const chat = installChat(app, { store, readable, session, uploadDir, fail });
   app.get('/api/users', (req, res) =>
     res.json(
-      store.users().map((u) =>
+      chatDirectory(store, req.user, readable).map((u) =>
         manager(req.user)
           ? u
           : {
@@ -404,6 +449,7 @@ export function createApp({
               role: u.role,
               active: u.active,
               managerId: u.managerId,
+              company: u.company,
             },
       ),
     ),
@@ -488,7 +534,7 @@ export function createApp({
     const data = z
         .object({
           active: z.boolean(),
-          role: z.enum(['admin', 'manager', 'member']),
+          role: z.enum(['admin', 'manager', 'member', 'guest']),
           name: z.string().trim().min(2).max(100).optional(),
           managerId: z.string().max(100).optional(),
           department: z.string().trim().max(100).optional(),
@@ -501,7 +547,7 @@ export function createApp({
     if (!target) fail(404, 'Account not found');
     validateManager(data.managerId ?? target.managerId, target.id);
     if (
-      (!data.active || data.role === 'member') &&
+      (!data.active || !['admin', 'manager'].includes(data.role)) &&
       store.users().some((u) => u.managerId === target.id)
     )
       fail(409, 'Reassign this person’s reports before disabling or removing their manager role');

@@ -46,7 +46,10 @@ export function People({
       key: 'role',
       label: 'Role',
       type: 'select',
-      options: ['member', 'manager', 'admin'].map((v) => ({ value: v, label: v })),
+      options: (form?.role === 'guest'
+        ? ['guest', 'member', 'manager', 'admin']
+        : ['member', 'manager', 'admin']
+      ).map((v) => ({ value: v, label: v })),
       default: 'member',
       help: 'Members work on assigned projects. Managers review work and leave. Administrators also manage accounts.',
     },
