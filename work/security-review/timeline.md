@@ -19,3 +19,10 @@
 - corrected: native files cannot be overwritten through simplified JSON document updates; imported archives are retained byte-for-byte; signing reads the latest saved native PDF
 - corrected: backups and certificate/private-secret files are excluded from Docker build context
 - limitation: no Semgrep/CodeQL result claimed; manual source tracing, targeted searches and executable regression tests used. Upstream engine internals and production infrastructure remain outside this source review.
+
+## 2026-10-14 | workforce and account lifecycle review
+- scope: owned app APIs, additive SQLite migration, organisation defaults, employee onboarding, password rotation/reset, shared work calendar and atomic weekly time entry
+- verified: six targeted backend regressions cover temporary-password gating, ordinary-member self-service, admin authority, version conflicts, project membership, allowance creation, session revocation, no password values in audit, cross-year calendar boundaries, work/leave conflicts, approval rechecks, atomic rollback and employee calendar privacy
+- UI evidence: organisation onboarding, member profile/password replacement, leave approval reflected in Timesheets, 5-day batch time entry, dark/mobile calendar and account search tested with real browser contexts
+- spreadsheet evidence: native range selection, merge/unmerge and rectangular clipboard paste verified against actual exported XLSX parts
+- limitations: single organisation per deployment; no email invitation delivery, SSO/MFA, payroll or qualified signature service added in this upgrade

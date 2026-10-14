@@ -288,7 +288,7 @@ export function Select({
   return (
     <label className="select-wrap">
       <span className="sr-only">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
+      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

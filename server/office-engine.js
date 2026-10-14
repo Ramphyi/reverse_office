@@ -83,7 +83,8 @@ export function createOfficeEngine({ store, dataDir, env = process.env, fetcher 
       fail(403, 'Document is not accessible');
     return item;
   }
-  const activeUser = (id) => store.users().find((u) => u.id === id && u.active);
+  const activeUser = (id) =>
+    store.users().find((u) => u.id === id && u.active && !u.mustChangePassword);
   function putAsset(collection, item, bytes, fileType, actor) {
     if (bytes.length > 50 * 1024 * 1024) fail(413, 'Office file exceeds the 50 MiB limit');
     if (fileType === 'pdf') {

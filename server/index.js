@@ -25,14 +25,15 @@ const server = createServer(app),
 app.locals.io = io;
 io.use((socket, next) => {
   const user = session(socket.request);
-  if (!user || socket.handshake.auth.csrf !== user.csrf) return next(Error('Unauthorized'));
+  if (!user || user.must_change_password || socket.handshake.auth.csrf !== user.csrf)
+    return next(Error('Unauthorized'));
   socket.data.user = user;
   next();
 });
 io.on('connection', (socket) => {
   socket.use((event, next) => {
     const user = session(socket.request);
-    if (!user) {
+    if (!user || user.must_change_password) {
       socket.disconnect(true);
       return;
     }

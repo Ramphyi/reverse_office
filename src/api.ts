@@ -1,5 +1,15 @@
 export type Item = Record<string, any>;
-export type User = { id: string; name: string; email: string; role: string; active: number };
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active: number;
+  mustChangePassword?: boolean;
+  department?: string;
+  jobTitle?: string;
+  calendarId?: string;
+};
 export type State = Record<string, Item[]>;
 let csrf = '';
 export const setCsrf = (value: string) => {

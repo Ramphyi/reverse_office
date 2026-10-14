@@ -1,3 +1,6 @@
+import { WorkCalendar } from './WorkCalendar';
+import { People } from './People';
+import { Organisation } from './Organisation';
 import { useEffect, useState } from 'react';
 import {
   Plus,
@@ -39,7 +42,7 @@ const isManager = (user: User) => ['admin', 'manager'].includes(user.role);
 export function Timesheets({ state, user, users, refresh, notify }: Props) {
   const [editing, setEditing] = useState<Item | null>(null),
     [tab, setTab] = useState('mine'),
-    [month, setMonth] = useState(isoToday().slice(0, 7));
+    [month, setMonth] = useState(localStorage.getItem('work-month') || isoToday().slice(0, 7));
   const all = state.timesheets ?? [],
     rows = all
       .filter(
@@ -75,6 +78,15 @@ export function Timesheets({ state, user, users, refresh, notify }: Props) {
     ]);
   return (
     <>
+      <WorkCalendar
+        state={state}
+        user={user}
+        users={users}
+        refresh={refresh}
+        notify={notify}
+        monthValue={month}
+        onMonthChange={setMonth}
+      />
       <div className="stat-row">
         <Stat label="Recorded this month" value={`${total.toFixed(1)} h`} icon={Clock3} />
         <Stat label="Approved time" value={`${approved.toFixed(1)} h`} icon={Check} />
@@ -267,9 +279,20 @@ function Stat({ label, value, icon: Icon }: { label: string; value: string; icon
 }
 export function TimeOff({ state, user, users, refresh, notify }: Props) {
   const [open, setOpen] = useState(false),
-    [year, setYear] = useState(new Date().getFullYear()),
+    [year, setYear] = useState(
+      Number((localStorage.getItem('work-month') || isoToday()).slice(0, 4)),
+    ),
+    [workMonth, setWorkMonth] = useState(
+      localStorage.getItem('work-month') || isoToday().slice(0, 7),
+    ),
     [balance, setBalance] = useState<Item>({}),
-    [calendar, setCalendar] = useState('default');
+    [calendar, setCalendar] = useState(user.calendarId || 'default');
+  useEffect(() => {
+    if (!user.calendarId)
+      api('/organisation')
+        .then((org) => setCalendar(org.calendarId))
+        .catch((e) => notify(e.message));
+  }, [user.calendarId]);
   useEffect(() => {
     api(`/leave-balance?year=${year}&calendarId=${encodeURIComponent(calendar)}`)
       .then(setBalance)
@@ -290,12 +313,27 @@ export function TimeOff({ state, user, users, refresh, notify }: Props) {
   };
   return (
     <>
+      <WorkCalendar
+        state={state}
+        user={user}
+        users={users}
+        refresh={refresh}
+        notify={notify}
+        monthValue={workMonth}
+        onMonthChange={(v) => {
+          setWorkMonth(v);
+          setYear(Number(v.slice(0, 4)));
+        }}
+      />
       <div className="section-bar">
         <div className="heading-actions">
           <Select
             label="Leave year"
             value={String(year)}
-            onChange={(v) => setYear(Number(v))}
+            onChange={(v) => {
+              setYear(Number(v));
+              setWorkMonth(v + '-' + workMonth.slice(5));
+            }}
             options={Array.from({ length: 5 }, (_, i) => ({
               value: String(new Date().getFullYear() - 2 + i),
               label: String(new Date().getFullYear() - 2 + i),
@@ -624,7 +662,7 @@ export function Admin({
   }, [tab]);
   const calendarForm = (initial?: Item) =>
     setForm({
-      title: initial ? 'Edit calendar' : 'Create yearly calendar',
+      title: initial?.id ? 'Edit calendar' : 'Create yearly calendar',
       initial: initial
         ? { ...initial, holidays: initial.holidays.join('\n'), weekend: initial.weekend.join(',') }
         : undefined,
@@ -718,6 +756,7 @@ export function Admin({
       <div className="tabs admin-tabs">
         {[
           { id: 'people', name: 'People', Icon: Users },
+          { id: 'organisation', name: 'Organisation', Icon: Settings2 },
           { id: 'calendars', name: 'Calendars', Icon: CalendarDays },
           { id: 'entitlements', name: 'Leave allowances', Icon: Clock3 },
           ...(user.role === 'admin' ? [{ id: 'audit', name: 'Audit log', Icon: ShieldCheck }] : []),
@@ -730,119 +769,10 @@ export function Admin({
         ))}
       </div>
       {tab === 'people' && (
-        <>
-          <div className="section-bar">
-            <h2>
-              Your people <span className="count">{users.length}</span>
-            </h2>
-            {user.role === 'admin' && (
-              <button
-                className="button primary"
-                onClick={() =>
-                  setForm({
-                    title: 'Create an account',
-                    fields: [
-                      { key: 'name', label: 'Full name', required: true },
-                      { key: 'email', label: 'Work email', type: 'email', required: true },
-                      {
-                        key: 'password',
-                        label: 'Initial password (minimum 12 characters)',
-                        type: 'password',
-                        required: true,
-                      },
-                      {
-                        key: 'role',
-                        label: 'Role',
-                        type: 'select',
-                        options: ['member', 'manager', 'admin'].map((v) => ({
-                          value: v,
-                          label: v,
-                        })),
-                        default: 'member',
-                      },
-                    ],
-                    submit: async (data) => {
-                      await api('/users', 'POST', data);
-                      await refresh();
-                      notify('Account created. Share the initial password securely.');
-                    },
-                  })
-                }
-              >
-                <Plus size={16} /> Add person
-              </button>
-            )}
-          </div>
-          <div className="panel data-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Person</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <span className="table-person">
-                        <span className="avatar">{initials(u.name)}</span>
-                        <strong>{u.name}</strong>
-                      </span>
-                    </td>
-                    <td>{u.email}</td>
-                    <td>
-                      <Badge>{u.role}</Badge>
-                    </td>
-                    <td>
-                      <span className={`status-dot ${u.active ? 'done' : ''}`} />{' '}
-                      {u.active ? 'Active' : 'Disabled'}
-                    </td>
-                    <td>
-                      {user.role === 'admin' && u.id !== user.id && (
-                        <button
-                          className="text-link"
-                          onClick={() =>
-                            setForm({
-                              title: 'Manage account',
-                              initial: { ...u, active: !!u.active },
-                              fields: [
-                                {
-                                  key: 'role',
-                                  label: 'Role',
-                                  type: 'select',
-                                  options: ['member', 'manager', 'admin'].map((v) => ({
-                                    value: v,
-                                    label: v,
-                                  })),
-                                },
-                                { key: 'active', label: 'Account active', type: 'checkbox' },
-                              ],
-                              submit: async (data) => {
-                                await api(`/users/${u.id}`, 'PATCH', data);
-                                await refresh();
-                                notify('Account updated; existing sessions revoked');
-                              },
-                            })
-                          }
-                        >
-                          Manage
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="footnote">
-            Members access their projects. Managers manage projects, rates and approvals.
-            Administrators also manage accounts and review the audit trail.
-          </p>
-        </>
+        <People state={state} user={user} users={users} refresh={refresh} notify={notify} />
+      )}
+      {tab === 'organisation' && (
+        <Organisation state={state} user={user} users={users} refresh={refresh} notify={notify} />
       )}
       {tab === 'calendars' && (
         <>
@@ -872,6 +802,23 @@ export function Admin({
                 </div>
                 <button className="button secondary" onClick={() => calendarForm(c)}>
                   Edit calendar
+                </button>
+                <button
+                  className="button secondary"
+                  disabled={state.calendars?.some(
+                    (next) => next.calendarId === c.calendarId && next.year === c.year + 1,
+                  )}
+                  onClick={() =>
+                    calendarForm({
+                      ...c,
+                      id: undefined,
+                      version: undefined,
+                      year: c.year + 1,
+                      holidays: [],
+                    })
+                  }
+                >
+                  Create next year
                 </button>
               </article>
             ))}

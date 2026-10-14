@@ -1,3 +1,4 @@
+import { Account } from './Account';
 import { useEffect, useRef, useState } from 'react';
 import {
   Home,
@@ -119,6 +120,7 @@ const sections = [
       ['leave', 'Time off', CalendarDays],
       ['reports', 'Reports', Activity],
       ['admin', 'Administration', ShieldCheck],
+      ['account', 'My account', Users],
     ],
   },
 ];
@@ -158,6 +160,7 @@ export default function App() {
     [toast, setToast] = useState(''),
     [mobile, setMobile] = useState(false),
     [integrations, setIntegrations] = useState<Item>({}),
+    [organisation, setOrganisation] = useState<Item>({}),
     [selectedPdf, setSelectedPdf] = useState<Item | null>(null),
     [folder, setFolder] = useState(''),
     [projectFilter, setProjectFilter] = useState(''),
@@ -173,14 +176,16 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
   const refresh = async () => {
-    const [data, people, services] = await Promise.all([
+    const [data, people, services, org] = await Promise.all([
       api('/state'),
       api('/users'),
       api('/integrations'),
+      api('/organisation'),
     ]);
     setState(data);
     setUsers(people);
     setIntegrations(services);
+    setOrganisation(org);
   };
   useEffect(() => {
     Promise.all([api('/setup'), api('/me').catch(() => null)])
@@ -195,10 +200,10 @@ export default function App() {
       .finally(() => setLoading(false));
   }, []);
   useEffect(() => {
-    if (auth) refresh().catch((e) => notify(e.message));
+    if (auth && !auth.user.mustChangePassword) refresh().catch((e) => notify(e.message));
   }, [auth]);
   useEffect(() => {
-    if (page === 'mail' && auth)
+    if (page === 'mail' && auth && !auth.user.mustChangePassword)
       api('/mail')
         .then(setMail)
         .catch((e) => notify(e.message));
@@ -242,6 +247,16 @@ export default function App() {
     projects = state.projects ?? [],
     documents = state.documents ?? [],
     tasks = state.tasks ?? [];
+  const accountChanged = (a: Item) => {
+    setCsrf(a.csrf);
+    setAuth(a as { user: User; csrf: string });
+  };
+  if (user.mustChangePassword)
+    return (
+      <main className="forced-account">
+        <Account user={user} onChanged={accountChanged} onLogout={() => setAuth(null)} />
+      </main>
+    );
   const navigate = (id: string) => {
     if (
       (doc || pdfEditing) &&
@@ -491,8 +506,8 @@ export default function App() {
         <div className="workspace-switch">
           <span className="workspace-monogram">W</span>
           <div>
-            <strong>My workspace</strong>
-            <small>Private workspace</small>
+            <strong>{organisation.name || 'My workspace'}</strong>
+            <small>{organisation.timezone || 'Private workspace'}</small>
           </div>
           <LockKeyhole size={13} />
         </div>
@@ -1161,6 +1176,9 @@ export default function App() {
                   />
                 )}
                 {page === 'reports' && <Reports state={state} notify={notify} />}
+                {page === 'account' && (
+                  <Account user={user} onChanged={accountChanged} onLogout={() => setAuth(null)} />
+                )}
                 {page === 'admin' && (
                   <Admin
                     state={state}

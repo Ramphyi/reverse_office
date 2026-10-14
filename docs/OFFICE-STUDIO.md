@@ -76,6 +76,26 @@ Integration references: [configuration](https://api.onlyoffice.com/docs/docs-api
 
 ## Native integration tests
 
+## Organisation, accounts and the work calendar
+
+Administration → Organisation sets the organisation name, default working calendar, standard daily hours, timezone label, initial annual leave allowance and carryover limit. This deployment contains one organisation; it is not a multi-tenant SaaS or an organisation switcher. The timezone is stored as organisation metadata; date-only work/leave entries retain their exact selected date and browser date formatting is local. The company name appears in the sidebar. Existing allowances and approved records are not rewritten when defaults change.
+
+Administration → People supports search and active/disabled filters. Add person creates an actual login account, department/job title, role, working-calendar assignment, project memberships and an allowance for the selected year in one transaction. The UI requires a personal password change by default at first sign-in. Share the temporary password through your own trusted channel; no invitation email is sent. Manage changes project access, employee details, role or active status and revokes the person's sessions. Reset password requires the administrator's current password and forces replacement of the new temporary password. Administrators cannot remove their own administrator access.
+
+Every role has **My account** in the sidebar for changing display name and password. Password changes require the current password and matching confirmation, use a 12-character minimum, replace the current session and revoke other sessions. Temporary-password accounts cannot access workspace APIs or chat until they replace the temporary password. Password reset and account changes are audited; password values are not included in audit records.
+
+**Timesheets** and **Time off** share a monthly calendar and remember its selected month. The timesheet list/totals and leave year follow the selected month. Select a day to see entries, pending/approved leave and holidays, log work, request leave, edit/delete an editable time entry or fill a working week. Managers can select an employee; ordinary members can only query their own work calendar. A project filter uses that project's calendar; otherwise the employee's assigned calendar or organisation default applies. Missing calendar years are explicitly marked and use Saturday/Sunday as the fallback weekend.
+
+Fill working week creates a separate time entry for each entered day, either Draft or Submitted. Fill remaining capacity subtracts existing non-rejected hours and excludes approved full-day leave, holidays and weekends. All entries in a batch are saved or rejected together. Zero-hour fields are skipped; existing entries are never silently overwritten. Calendar CSV exports daily hours, capacity, holiday and leave information. Timesheet CSV remains available for detailed work records.
+
+Leave is full-day. Approved leave prevents logging work on covered working days; work records prevent requesting or approving conflicting leave. Pending leave is visible but does not reduce capacity; logging work while a request is pending means the manager must resolve the conflict before approval. Approved work/leave requires another manager's review. A manager can cancel approved leave from the day's details with a reason, which restores capacity and allowance; the historical request and audit record remain. A cancellation is stored as a closed/rejected request with its cancellation reason. Holidays/weekends remain non-working capacity days, but explicit overtime is allowed. Daily total hours cannot exceed 24.
+
+Administration → Calendars → Create next year copies the calendar identifier and weekend rules, **with an empty holiday list** so date-dependent holidays are configured intentionally. Annual allowances are maintained separately by person, calendar and year. The existing capped carryover calculation and cross-year approval checks remain in effect. This is capacity tracking, not a payroll or employment-law compliance engine.
+
+In the native Sheets editor, select a rectangular range by dragging, Shift-clicking, or entering e.g. `A12:D12` in the name box. Home → Merge and center merges it; the drop-down also offers other merge/unmerge modes. Only the upper-left value is retained when merging. Clipboard paste accepts tab-separated rows and columns. The expandable spreadsheet help above the editor explains the controls. A real-engine browser test merges and unmerges `A12:D12`, pastes a 2×2 block, and verifies the exported XLSX XML. See the [upstream merge guide](https://helpcenter.onlyoffice.com/docs/userguides/spreadsheet_editor/MergeCells.aspx).
+
+## Running the native integration tests
+
 ```powershell
 npm run build
 npm test
