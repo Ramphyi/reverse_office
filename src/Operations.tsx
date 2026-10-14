@@ -1,3 +1,4 @@
+import { TimeEntry } from './TimeEntry';
 import { AISettings } from './AISettings';
 import { WorkCalendar } from './WorkCalendar';
 import { People } from './People';
@@ -66,11 +67,12 @@ export function Timesheets({ state, user, users, refresh, notify }: Props) {
   };
   const exportRows = () =>
     downloadCsv('timesheets.csv', [
-      ['Employee', 'Date', 'Project', 'Hours', 'Billable', 'Description', 'Status'],
+      ['Employee', 'Date', 'Project', 'Activity', 'Hours', 'Billable', 'Description', 'Status'],
       ...rows.map((r) => [
         users.find((u) => u.id === r.userId)?.name,
         r.date,
         state.projects?.find((p) => p.id === r.projectId)?.title,
+        r.activity || 'Work from office',
         r.hours,
         r.billable,
         r.description,
@@ -144,7 +146,9 @@ export function Timesheets({ state, user, users, refresh, notify }: Props) {
                 </td>
                 <td>
                   <strong>{state.projects?.find((p) => p.id === r.projectId)?.title}</strong>
-                  <small>{r.description}</small>
+                  <small>
+                    {r.activity || 'Work from office'} · {r.description}
+                  </small>
                 </td>
                 <td>
                   <b>{r.hours}h</b>
@@ -215,52 +219,13 @@ export function Timesheets({ state, user, users, refresh, notify }: Props) {
         approves your work.
       </p>
       {editing && (
-        <FormModal
-          title={editing.id ? 'Edit time entry' : 'Log your time'}
+        <TimeEntry
           initial={editing}
+          projects={state.projects || []}
           onClose={() => setEditing(null)}
-          fields={[
-            {
-              key: 'projectId',
-              label: 'Project',
-              type: 'select',
-              options: (state.projects ?? []).map((p) => ({ value: p.id, label: p.title })),
-              required: true,
-              default: state.projects?.[0]?.id,
-            },
-            { key: 'date', label: 'Work date', type: 'date', required: true, default: isoToday() },
-            {
-              key: 'hours',
-              label: 'Hours worked',
-              type: 'number',
-              required: true,
-              min: 0.25,
-              max: 24,
-              step: '.25',
-              default: 8,
-            },
-            {
-              key: 'description',
-              label: 'What did you work on?',
-              type: 'textarea',
-              required: true,
-            },
-            { key: 'billable', label: 'Billable to client', type: 'checkbox', default: true },
-            {
-              key: 'status',
-              label: 'Save as',
-              type: 'select',
-              options: [
-                { value: 'Draft', label: 'Draft' },
-                { value: 'Submitted', label: 'Submit for approval' },
-              ],
-              default: 'Draft',
-            },
-          ]}
-          onSubmit={async (data) => {
-            await save('timesheets', data);
+          onSaved={async () => {
             await refresh();
-            notify('Time entry saved');
+            notify('Calendar updated');
           }}
         />
       )}
@@ -461,7 +426,10 @@ export function TimeOff({ state, user, users, refresh, notify }: Props) {
               key: 'type',
               label: 'Leave type',
               type: 'select',
-              options: ['Annual', 'Sick', 'Unpaid'].map((v) => ({ value: v, label: v })),
+              options: ['Annual', 'Sick', 'Unpaid', 'Special occasion'].map((v) => ({
+                value: v,
+                label: v,
+              })),
               default: 'Annual',
             },
             { key: 'start', label: 'First day', type: 'date', required: true },

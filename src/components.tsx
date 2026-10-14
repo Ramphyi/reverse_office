@@ -183,79 +183,91 @@ export function FormModal({
         }}
       >
         <div className="form-fields">
-          {fields.map((f) => (
-            <label key={f.key} className={f.type === 'checkbox' ? 'check-field' : ''}>
-              <span>
-                {f.label}
-                {f.required && <em> *</em>}
-              </span>
-              {f.type === 'select' ? (
-                <select
-                  aria-label={f.label}
-                  required={f.required}
-                  value={data[f.key]}
-                  onChange={(e) => setData({ ...data, [f.key]: e.target.value })}
-                >
-                  {f.options?.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              ) : f.type === 'multiselect' ? (
-                <div className="multi-options">
-                  {f.options?.map((o) => (
-                    <label key={o.value}>
-                      <input
-                        type="checkbox"
-                        checked={data[f.key].includes(o.value)}
-                        onChange={(e) =>
-                          setData({
-                            ...data,
-                            [f.key]: e.target.checked
-                              ? [...data[f.key], o.value]
-                              : data[f.key].filter((x: string) => x !== o.value),
-                          })
-                        }
-                      />
-                      {o.label}
-                    </label>
-                  ))}
-                </div>
-              ) : f.type === 'textarea' ? (
-                <textarea
-                  aria-label={f.label}
-                  rows={5}
-                  required={f.required}
-                  value={data[f.key]}
-                  onChange={(e) => setData({ ...data, [f.key]: e.target.value })}
-                />
-              ) : (
-                <input
-                  aria-label={f.label}
-                  type={f.type || 'text'}
-                  required={f.required}
-                  min={f.min}
-                  max={f.max}
-                  step={f.step}
-                  checked={f.type === 'checkbox' ? data[f.key] : undefined}
-                  value={f.type === 'checkbox' ? undefined : data[f.key]}
-                  onChange={(e) =>
-                    setData({
-                      ...data,
-                      [f.key]:
-                        f.type === 'checkbox'
-                          ? e.target.checked
-                          : f.type === 'number'
-                            ? Number(e.target.value)
-                            : e.target.value,
-                    })
-                  }
-                />
-              )}{' '}
-              {f.help && <small>{f.help}</small>}
-            </label>
-          ))}
+          {fields.map((f) => {
+            const FieldContainer = f.type === 'multiselect' ? 'div' : 'label';
+            return (
+              <FieldContainer
+                key={f.key}
+                className={
+                  f.type === 'checkbox'
+                    ? 'check-field'
+                    : f.type === 'multiselect'
+                      ? 'multi-field'
+                      : ''
+                }
+              >
+                <span>
+                  {f.label}
+                  {f.required && <em> *</em>}
+                </span>
+                {f.type === 'select' ? (
+                  <select
+                    aria-label={f.label}
+                    required={f.required}
+                    value={data[f.key]}
+                    onChange={(e) => setData({ ...data, [f.key]: e.target.value })}
+                  >
+                    {f.options?.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : f.type === 'multiselect' ? (
+                  <div className="multi-options">
+                    {f.options?.map((o) => (
+                      <label key={o.value}>
+                        <input
+                          type="checkbox"
+                          checked={data[f.key].includes(o.value)}
+                          onChange={(e) =>
+                            setData({
+                              ...data,
+                              [f.key]: e.target.checked
+                                ? [...data[f.key], o.value]
+                                : data[f.key].filter((x: string) => x !== o.value),
+                            })
+                          }
+                        />
+                        {o.label}
+                      </label>
+                    ))}
+                  </div>
+                ) : f.type === 'textarea' ? (
+                  <textarea
+                    aria-label={f.label}
+                    rows={5}
+                    required={f.required}
+                    value={data[f.key]}
+                    onChange={(e) => setData({ ...data, [f.key]: e.target.value })}
+                  />
+                ) : (
+                  <input
+                    aria-label={f.label}
+                    type={f.type || 'text'}
+                    required={f.required}
+                    min={f.min}
+                    max={f.max}
+                    step={f.step}
+                    checked={f.type === 'checkbox' ? data[f.key] : undefined}
+                    value={f.type === 'checkbox' ? undefined : data[f.key]}
+                    onChange={(e) =>
+                      setData({
+                        ...data,
+                        [f.key]:
+                          f.type === 'checkbox'
+                            ? e.target.checked
+                            : f.type === 'number'
+                              ? Number(e.target.value)
+                              : e.target.value,
+                      })
+                    }
+                  />
+                )}{' '}
+                {f.help && <small>{f.help}</small>}
+              </FieldContainer>
+            );
+          })}
         </div>
         {error && (
           <div role="alert" className="error">

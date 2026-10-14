@@ -1,3 +1,5 @@
+import { DriveSharing, SharedDrive, fileDownload } from './DriveSharing';
+import { Mailbox } from './Mailbox';
 import { GuestInvitation } from './ChatSpaces';
 import { Account } from './Account';
 import { useEffect, useRef, useState } from 'react';
@@ -151,6 +153,8 @@ const subtitles: Record<string, string> = {
   chat: 'Good things happen when we connect.',
 };
 export default function App() {
+  const [sharing, setSharing] = useState<Item | null>(null),
+    [mailCompose, setMailCompose] = useState<Item | null>(null);
   const [inviteToken, setInviteToken] = useState(
     () => new URLSearchParams(location.hash.slice(1)).get('invite') || '',
   );
@@ -179,9 +183,7 @@ export default function App() {
     [organisation, setOrganisation] = useState<Item>({}),
     [selectedPdf, setSelectedPdf] = useState<Item | null>(null),
     [folder, setFolder] = useState(''),
-    [projectFilter, setProjectFilter] = useState(''),
-    [mail, setMail] = useState<Item[]>([]),
-    [selectedMail, setSelectedMail] = useState<Item | null>(null);
+    [projectFilter, setProjectFilter] = useState('');
   const [docDirty, setDocDirty] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null),
     importRef = useRef<HTMLInputElement>(null);
@@ -218,12 +220,6 @@ export default function App() {
   useEffect(() => {
     if (auth && !auth.user.mustChangePassword) refresh().catch((e) => notify(e.message));
   }, [auth]);
-  useEffect(() => {
-    if (page === 'mail' && auth && !auth.user.mustChangePassword)
-      api('/mail')
-        .then(setMail)
-        .catch((e) => notify(e.message));
-  }, [page, auth]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -298,6 +294,9 @@ export default function App() {
           <span>
             {user.name} · {user.company}
           </span>
+          <button className="button" onClick={() => setPage('shared')}>
+            Shared files
+          </button>
           <ThemePicker value={choice} onChange={setChoice} />
           <button
             className="button"
@@ -315,7 +314,9 @@ export default function App() {
             Sign out
           </button>
         </header>
-        {page === 'account' ? (
+        {page === 'shared' ? (
+          <SharedDrive />
+        ) : page === 'account' ? (
           <Account user={user} onChanged={accountChanged} onLogout={() => setAuth(null)} />
         ) : (
           <Chat
@@ -400,7 +401,7 @@ export default function App() {
   };
   const newTask = (initial?: Item) =>
     setModal({
-      title: initial ? 'Edit task' : 'Create a task',
+      title: initial?.id ? 'Edit task' : 'Create a task',
       initial,
       fields: [
         { key: 'title', label: 'Task name', required: true },
@@ -466,7 +467,10 @@ export default function App() {
           key: 'members',
           label: 'Project members',
           type: 'multiselect',
-          options: userOptions,
+          options: users
+            .filter((u) => u.active && u.role !== 'guest')
+            .map((u) => ({ value: u.id, label: `${u.name} · ${u.email}` })),
+          help: 'Select everyone who should work on this project. You can change the team later.',
           default: [user.id],
         },
         {
@@ -491,7 +495,10 @@ export default function App() {
           key: 'attendees',
           label: 'Invite people',
           type: 'multiselect',
-          options: userOptions,
+          options: users
+            .filter((u) => u.active && u.role !== 'guest')
+            .map((u) => ({ value: u.id, label: `${u.name} · ${u.email}` })),
+          help: 'Select everyone who should work on this project. You can change the team later.',
           default: [user.id],
         },
         { key: 'description', label: 'Agenda', type: 'textarea' },
@@ -520,6 +527,10 @@ export default function App() {
         (!projectFilter || x.projectId === projectFilter),
     );
   const openDoc = (d: Item) => {
+    if (d.canEdit === false) {
+      window.location.assign(fileDownload(d));
+      return;
+    }
     if (
       (doc || pdfEditing) &&
       docDirty &&
@@ -545,25 +556,17 @@ export default function App() {
       notify((e as Error).message);
     }
   };
-  const compose = () =>
-    setModal({
-      title: 'New message',
-      description:
-        'Internal mail is available immediately. External delivery uses your configured SMTP server.',
-      fields: [
-        { key: 'to', label: 'To', type: 'email', required: true },
-        { key: 'subject', label: 'Subject', required: true },
-        { key: 'body', label: 'Message', type: 'textarea', required: true },
-      ],
-      submitLabel: 'Send message',
-      submit: async (data) => {
-        await api('/mail', 'POST', data);
-        setMail(await api('/mail'));
-        notify('Message sent');
-      },
-    });
+  const compose = () => setMailCompose({});
   return (
     <div className={`app ${ai ? 'assistant-open' : ''}`}>
+      {sharing && (
+        <DriveSharing
+          item={sharing}
+          users={users}
+          onClose={() => setSharing(null)}
+          onSaved={refresh}
+        />
+      )}
       <WorkspaceSidebar
         key={user.id}
         sections={sections}
@@ -827,7 +830,10 @@ export default function App() {
                     <DocumentTable
                       docs={filtered(documents.filter((d) => d.kind === page))}
                       users={users}
-                      open={openDoc}
+                      open={(d) =>
+                        d.canEdit === false ? window.location.assign(fileDownload(d)) : openDoc(d)
+                      }
+                      share={setSharing}
                       remove={(d) => remove('documents', d)}
                     />
                   </>
@@ -896,18 +902,22 @@ export default function App() {
                           })),
                       ])}
                       users={users}
+                      share={setSharing}
                       open={(d) =>
-                        d.isFile
-                          ? d.kind === 'pdf'
-                            ? setSelectedPdf(d)
-                            : window.location.assign(`/api/files/${d.id}/download`)
-                          : openDoc(d)
+                        d.canEdit === false
+                          ? window.location.assign(fileDownload(d))
+                          : d.isFile
+                            ? d.kind === 'pdf'
+                              ? setSelectedPdf(d)
+                              : window.location.assign(`/api/files/${d.id}/download`)
+                            : openDoc(d)
                       }
                       remove={(d) => remove(d.isFile ? 'files' : 'documents', d)}
                     />
                     <p className="footnote">
                       <LockKeyhole size={13} /> Personal files are private. Project files are shared
-                      only with project members and managers.
+                      according to their individual permissions. Use Share to choose specific people
+                      or everyone in the workspace.
                     </p>
                   </>
                 )}
@@ -1108,7 +1118,25 @@ export default function App() {
                     </div>
                     <div className="kanban">
                       {['Backlog', 'In progress', 'In review', 'Done'].map((status) => (
-                        <div className="kanban-column" key={status}>
+                        <div
+                          className="kanban-column"
+                          key={status}
+                          aria-label={status + ' tasks'}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={async (e) => {
+                            e.preventDefault();
+                            const task = tasks.find(
+                              (t) => t.id === e.dataTransfer.getData('application/reverse-task'),
+                            );
+                            if (task && task.status !== status) {
+                              try {
+                                await mutate('tasks', { ...task, status });
+                              } catch (e) {
+                                notify((e as Error).message);
+                              }
+                            }
+                          }}
+                        >
                           <div className="kanban-heading">
                             <span
                               className={`status-dot ${status.toLowerCase().replace(' ', '-')}`}
@@ -1117,7 +1145,7 @@ export default function App() {
                             <span>{filtered(tasks).filter((t) => t.status === status).length}</span>
                             <button
                               className="icon-button"
-                              onClick={() => newTask()}
+                              onClick={() => newTask({ status, projectId: projectFilter })}
                               aria-label={`Add task to ${status}`}
                             >
                               <Plus size={15} />
@@ -1126,7 +1154,15 @@ export default function App() {
                           {filtered(tasks)
                             .filter((t) => t.status === status)
                             .map((t) => (
-                              <article key={t.id} className="task-card">
+                              <article
+                                key={t.id}
+                                className="task-card"
+                                draggable
+                                onDragStart={(e) => {
+                                  e.dataTransfer.setData('application/reverse-task', t.id);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                }}
+                              >
                                 <button className="task-name" onClick={() => newTask(t)}>
                                   {t.title}
                                 </button>
@@ -1134,6 +1170,11 @@ export default function App() {
                                   {projects.find((p) => p.id === t.projectId)?.title ||
                                     'Personal task'}
                                 </p>
+                                <small className="task-key">
+                                  {t.id.slice(0, 8).toUpperCase()}
+                                  {t.due ? ` · Due ${niceDate(t.due)}` : ''}
+                                </small>
+                                <p>{t.description?.slice(0, 140)}</p>
                                 <footer>
                                   <Badge>{t.priority}</Badge>
                                   <span
@@ -1218,60 +1259,12 @@ export default function App() {
                   />
                 )}
                 {page === 'mail' && (
-                  <div className="mail-layout">
-                    <aside>
-                      <div className="mail-folder-title">
-                        <Mail size={17} /> Inbox & sent <span>{mail.length}</span>
-                      </div>
-                      {mail.map((m) => (
-                        <button
-                          key={m.id}
-                          className={selectedMail?.id === m.id ? 'selected' : ''}
-                          onClick={() => setSelectedMail(m)}
-                        >
-                          <div>
-                            <strong>{m.from === user.email ? 'To: ' + m.to : m.from}</strong>
-                            <small>{niceDate(m.created)}</small>
-                          </div>
-                          <b>{m.subject}</b>
-                          <p>{m.body.slice(0, 90)}</p>
-                          <Badge>{m.status}</Badge>
-                        </button>
-                      ))}
-                      {!mail.length && (
-                        <Empty
-                          title="A fresh inbox"
-                          description="Send your first message to a teammate."
-                        />
-                      )}
-                    </aside>
-                    <section>
-                      {selectedMail ? (
-                        <>
-                          <div className="mail-detail-head">
-                            <h2>{selectedMail.subject}</h2>
-                            <Badge>{selectedMail.status}</Badge>
-                          </div>
-                          <p className="muted">
-                            From {selectedMail.from}
-                            <br />
-                            To {selectedMail.to} · {new Date(selectedMail.created).toLocaleString()}
-                          </p>
-                          <div className="mail-body">{selectedMail.body}</div>
-                        </>
-                      ) : (
-                        <Empty
-                          title="Your conversations, all together"
-                          description="Select a message or start a new conversation."
-                          action={
-                            <button className="button primary" onClick={compose}>
-                              <Plus size={16} /> Compose message
-                            </button>
-                          }
-                        />
-                      )}
-                    </section>
-                  </div>
+                  <Mailbox
+                    user={user}
+                    composeRequest={mailCompose}
+                    onConsumed={() => setMailCompose(null)}
+                    notify={notify}
+                  />
                 )}
               </>
             )}
@@ -1845,11 +1838,13 @@ function DocumentTable({
   users,
   open,
   remove,
+  share,
 }: {
   docs: Item[];
   users: User[];
   open: (d: Item) => void;
   remove?: (d: Item) => void;
+  share?: (d: Item) => void;
 }) {
   return (
     <div className="document-table panel">
@@ -1871,7 +1866,16 @@ function DocumentTable({
                   <span>
                     <strong>{d.title}</strong>
                     <small>
-                      {d.projectId ? 'Shared with project' : 'Only you'}
+                      {d.sharingMode === 'people'
+                        ? 'Specific people'
+                        : d.sharingMode === 'workspace'
+                          ? 'Everyone in workspace'
+                          : d.sharingMode === 'private'
+                            ? 'Only owner'
+                            : d.projectId
+                              ? 'Shared with project'
+                              : 'Only you'}
+                      {d.canEdit === false ? ' · Read only' : ''}
                       {d.signature ? ' · Signed copy' : ''}
                     </small>
                   </span>
@@ -1887,7 +1891,16 @@ function DocumentTable({
               </td>
               <td>{niceDate(d.updated)}</td>
               <td>
-                {remove ? (
+                {share && d.canEdit !== false && (
+                  <button
+                    className="button secondary"
+                    aria-label={`Share ${d.title}`}
+                    onClick={() => share(d)}
+                  >
+                    Share
+                  </button>
+                )}
+                {remove && d.canEdit !== false ? (
                   <button
                     className="icon-button subtle"
                     aria-label={`Delete ${d.title}`}

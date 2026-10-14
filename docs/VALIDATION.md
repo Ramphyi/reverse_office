@@ -68,3 +68,13 @@ Workforce upgrade, 2026-10-14: **40/40 backend tests, 4/4 workspace/Romania brow
 Office Studio upgrade, 2026-10-14: the Romania branch passed the production build, **34/34 backend tests, 3/3 workspace/Romania browser flows and 2/2 native Office browser flows** against the actual Document Server. These include the native editing, export, image insertion and two-account collaboration checks described above. ANAF remains simulated. The base image also passed a fresh hardened-container setup and actual native spreadsheet-to-PDF conversion through Document Server.
 
 After the baseline commit, `feature/romania-spv` passed **26/26 backend tests and 3/3 browser flows**. The `reverse-office:romania` Docker image built and passed authenticated billing writes under non-root/read-only execution. Printing generated `artifacts/invoice.pdf`; desktop/mobile screenshots are `artifacts/billing.png` and `artifacts/billing-mobile.png`. SPV/OAuth tests use an injected simulator and never contact ANAF. See [Romania workflow and evidence](ROMANIA.md).
+
+## Productivity workflows — 2026-10-14
+
+The main branch passes the production TypeScript/Vite build, **71/71 backend tests** and **8/8 workspace browser scenarios**. The seven new backend cases cover activity/leave separation and atomicity, project/task authorization, Drive sharing and revocation, BCC-safe drafts and attachments, SMTP envelope/TLS/acceptance semantics, gateway signatures/deduplication, and uncertain SMTP failure with preserved local delivery. After retaining sharing versions when reverting to project access, all seven productivity cases were rerun successfully.
+
+The new browser scenario verifies 8-hour defaults and +/- controls, special-occasion requests, per-day weekly inputs, multiple project members, task drag/drop, named file downloads, draft persistence with attachments, internal delivery and replies between accounts. Desktop and 390px mobile dark-mode compose screenshots were inspected, alongside the wider weekly dialog. Existing workspace, WebRTC, AI, guest/chat and workforce scenarios also passed.
+
+SMTP uses an injected transport in automated tests; external relay delivery, provider authentication and inbound adapter deployment have **not** been verified with live credentials. This release adds the gateway contract, not IMAP synchronization or Microsoft/Google OAuth. See [productivity and mail setup](PRODUCTIVITY.md) for supported behavior and limits.
+
+No dependencies or distributed runtime components were added. The strict license gate remains blocked for the full company image. Functional validation and the isolated host development preview do not certify or redeploy that Docker distribution.

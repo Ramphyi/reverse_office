@@ -251,8 +251,14 @@ export function createOfficeEngine({ store, dataDir, env = process.env, fetcher 
           asset = getAsset(item.id);
         if (payload.filetype && payload.filetype !== asset.file_type)
           fail(400, 'Unexpected saved file format');
+        if (!access.writable(actor, s.collection, item)) fail(403, 'Document is read only');
         const bytes = await download(payload.url);
-        check(actor, s.collection, s.entity_id);
+        const latest = check(actor, s.collection, s.entity_id);
+        if (
+          !access.writable(actor, s.collection, latest) ||
+          !db.prepare('SELECT active FROM office_sessions WHERE key=?').get(s.key)?.active
+        )
+          fail(403, 'Editing access was revoked');
         store.transaction(() => {
           const saved = putAsset(s.collection, item, bytes, asset.file_type, actor.id);
           if (typeof payload.userdata === 'string')
@@ -321,6 +327,14 @@ export function createOfficeEngine({ store, dataDir, env = process.env, fetcher 
       res.status(201).json({ ...item, office: metadata(item.id) });
     });
     app.post('/api/office/:collection/:id/config', async (req, res) => {
+      if (
+        !access.writable(
+          req.user,
+          req.params.collection,
+          store.get(req.params.collection, req.params.id),
+        )
+      )
+        fail(403, 'Read-only share: download this document from Drive');
       requireEngine();
       const { collection, id } = req.params,
         item = check(req.user, collection, id),
@@ -417,6 +431,14 @@ export function createOfficeEngine({ store, dataDir, env = process.env, fetcher 
       });
     });
     app.post('/api/office/:collection/:id/save', async (req, res) => {
+      if (
+        !access.writable(
+          req.user,
+          req.params.collection,
+          store.get(req.params.collection, req.params.id),
+        )
+      )
+        fail(403, 'Read-only document');
       requireEngine();
       check(req.user, req.params.collection, req.params.id);
       const s = db

@@ -56,6 +56,9 @@ export const schemas = {
     hours: z.number().gt(0).max(24),
     description: text,
     billable: z.boolean().default(true),
+    activity: z
+      .enum(['Work from office', 'Work from home', 'Business trip', 'Training', 'Other work'])
+      .default('Work from office'),
     status: z.enum(['Draft', 'Submitted', 'Approved', 'Rejected']).default('Draft'),
     userId: z.string().optional(),
   }),
@@ -63,7 +66,7 @@ export const schemas = {
     .object({
       start: date,
       end: date,
-      type: z.enum(['Annual', 'Sick', 'Unpaid']),
+      type: z.enum(['Annual', 'Sick', 'Unpaid', 'Special occasion']),
       reason: z.string().max(1000).default(''),
       calendarId: z.string().max(100).default(''),
       status: z.enum(['Pending', 'Approved', 'Rejected']).default('Pending'),
