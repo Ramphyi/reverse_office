@@ -296,3 +296,92 @@ test('organisation AI settings require admin and CSRF and drive the selected mod
   assert.equal(seen[0].body.model, 'chosen-fixture');
   assert.equal((await request('/ai/settings', config)).status, 409);
 });
+
+test('Nova creates a chart from authorized computed cells and rejects private charts for other users', async () => {
+  delete process.env.OPENCODE_BASE_URL;
+  process.env.AI_BASE_URL = providerBase;
+  responder = async (req, body) =>
+    response(
+      body.messages.some((m) => m.role === 'tool')
+        ? { content: 'Chart from saved cells.' }
+        : {
+            tool_calls: [
+              call('sheet_chart', { id: privateDoc.id, range: 'B1:B3', title: 'Saved values' }),
+            ],
+          },
+    );
+  const r = await request('/ai', { prompt: 'Chart the saved values' });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.artifacts[0].type, 'chart');
+  assert.deepEqual(
+    r.data.artifacts[0].points.map((p) => p.value),
+    [7, 3, 10],
+  );
+  const denied = await request('/ai', { prompt: 'Chart private values' }, outsider);
+  assert.ok(!denied.data.artifacts?.length);
+});
+
+test('Nova MCP discovery and calls enforce roles and tool allowlists before contacting a service', async () => {
+  const oldConfig = process.env.NOVA_MCP_SERVERS;
+  let externalCalls = 0;
+  let selectedTool = 'mcp_catalog';
+  let selectedArgs = { server: 'knowledge' };
+  process.env.NOVA_MCP_SERVERS = JSON.stringify([
+    { id: 'knowledge', url: providerBase + '/mcp', tools: ['search'], roles: ['admin'] },
+  ]);
+  responder = async (req, body) => {
+    if (req.url === '/mcp') {
+      externalCalls++;
+      if (body.method === 'initialize')
+        return { jsonrpc: '2.0', id: body.id, result: { capabilities: { tools: {} } } };
+      if (body.method === 'notifications/initialized') return {};
+      if (body.method === 'tools/list')
+        return {
+          jsonrpc: '2.0',
+          id: body.id,
+          result: {
+            tools: [
+              {
+                name: 'search',
+                description: 'Search knowledge',
+                inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+              },
+              { name: 'delete_everything', inputSchema: { type: 'object' } },
+            ],
+          },
+        };
+      return {
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { content: [{ type: 'text', text: 'Allowed knowledge' }] },
+      };
+    }
+    const result = body.messages.findLast((m) => m.role === 'tool');
+    return response(
+      result ? { content: result.content } : { tool_calls: [call(selectedTool, selectedArgs)] },
+    );
+  };
+  try {
+    assert.equal((await request('/ai/connectors', null, outsider)).data.servers.length, 0);
+    const discovery = await request('/ai', { prompt: 'Discover knowledge tools' });
+    assert.equal(discovery.status, 200);
+    assert.match(discovery.data.text, /inputSchema/);
+    assert.match(discovery.data.text, /query/);
+    assert.doesNotMatch(discovery.data.text, /delete_everything/);
+    assert.equal(externalCalls, 3);
+    externalCalls = 0;
+    await request('/ai', { prompt: 'Discover private tools' }, outsider);
+    assert.equal(externalCalls, 0);
+    selectedTool = 'mcp_call';
+    selectedArgs = { server: 'knowledge', tool: 'delete_everything', arguments: {} };
+    await request('/ai', { prompt: 'Run an unlisted tool' });
+    assert.equal(externalCalls, 0);
+    selectedArgs = { server: 'knowledge', tool: 'search', arguments: { query: 'knowledge' } };
+    const allowed = await request('/ai', { prompt: 'Search allowed knowledge' });
+    assert.match(allowed.data.text, /Allowed knowledge/);
+    assert.equal(externalCalls, 3);
+  } finally {
+    if (oldConfig === undefined) delete process.env.NOVA_MCP_SERVERS;
+    else process.env.NOVA_MCP_SERVERS = oldConfig;
+  }
+});

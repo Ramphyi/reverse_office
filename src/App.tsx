@@ -1,3 +1,7 @@
+import { PdfWorkspace } from './PdfWorkspace';
+import { Appearance, AppWindows, AttendanceInbox, OrganisationGraph } from './WorkspaceExperience';
+import { TeamSpace } from './TeamSpace';
+import { CompatibleDocument } from './CompatibleDocument';
 import { DriveSharing, SharedDrive, fileDownload } from './DriveSharing';
 import { Mailbox } from './Mailbox';
 import { GuestInvitation } from './ChatSpaces';
@@ -74,7 +78,6 @@ import {
   type Field,
 } from './components';
 import { Editor } from './Editors';
-import { NativeEditor } from './NativeEditor';
 import { StudioEditor } from './StudioEditor';
 import { TemplateGallery } from './TemplateGallery';
 import { ThemePicker, useTheme } from './Theme';
@@ -82,7 +85,7 @@ import { Assistant } from './Assistant';
 import { WorkspaceSidebar } from './WorkspaceSidebar';
 import { Meetings, CallNotifications } from './Collaboration';
 import { Chat } from './Chat';
-import { Admin, TimeOff, Reports, Timesheets } from './Operations';
+import { Admin, Reports, TimeWorkspace } from './Operations';
 import { Romania } from './Romania';
 
 type ModalConfig = {
@@ -124,7 +127,7 @@ const sections = [
     label: 'MANAGE',
     items: [
       ['timesheets', 'Timesheets', Clock3],
-      ['leave', 'Time off', CalendarDays],
+      ['organisation-map', 'People map', Users],
       ['reports', 'Reports', Activity],
       ['billing', 'Billing · RO', BriefcaseBusiness],
       ['admin', 'Administration', ShieldCheck],
@@ -172,7 +175,10 @@ export default function App() {
     [setup, setSetup] = useState(false),
     [state, setState] = useState<State>({}),
     [users, setUsers] = useState<User[]>([]),
-    [page, setPage] = useState('home'),
+    [page, setPage] = useState(() => {
+      const v = new URLSearchParams(location.search).get('app') || 'home';
+      return v === 'leave' ? 'timesheets' : names[v] ? v : 'home';
+    }),
     [query, setQuery] = useState(''),
     [modal, setModal] = useState<ModalConfig | null>(null),
     [doc, setDoc] = useState<Item | null>(null),
@@ -298,6 +304,8 @@ export default function App() {
             Shared files
           </button>
           <ThemePicker value={choice} onChange={setChoice} />
+          <Appearance />
+          <AttendanceInbox onOpen={() => navigate('timesheets')} />
           <button
             className="button"
             onClick={() => setPage(page === 'account' ? 'chat' : 'account')}
@@ -348,7 +356,10 @@ export default function App() {
       setDoc(null);
     }
     setDocDirty(false);
-    setPage(id);
+    setPage(id === 'leave' ? 'timesheets' : id);
+    const url = new URL(location.href);
+    url.searchParams.set('app', id === 'leave' ? 'timesheets' : id);
+    history.replaceState(null, '', url);
     setQuery('');
     setMobile(false);
     setFolder('');
@@ -558,7 +569,9 @@ export default function App() {
   };
   const compose = () => setMailCompose({});
   return (
-    <div className={`app ${ai ? 'assistant-open' : ''}`}>
+    <div
+      className={`app module-${page} ${new URLSearchParams(location.search).get('window') === '1' ? 'detached-app' : ''} ${ai ? 'assistant-open' : ''}`}
+    >
       {sharing && (
         <DriveSharing
           item={sharing}
@@ -615,24 +628,26 @@ export default function App() {
             <CalendarDays size={19} />
           </button>
           <ThemePicker value={choice} onChange={setChoice} />
+          <Appearance />
+          <AttendanceInbox onOpen={() => navigate('timesheets')} />
           <button className={`assistant-trigger ${ai ? 'active' : ''}`} onClick={() => setAi(!ai)}>
-            <Sparkles size={17} /> Ask AI
+            <Sparkles size={17} /> Nova AI
           </button>
           <span className="avatar small">{initials(user.name)}</span>
         </header>
+        <AppWindows page={page} />
         {pdfEditing ? (
-          <NativeEditor
-            key={pdfEditing.id}
-            doc={pdfEditing}
-            collection="files"
-            theme={theme}
+          <PdfWorkspace
+            file={pdfEditing}
             onClose={() => {
-              setPdfEditing(null);
               setSelectedPdf(pdfEditing);
+              setPdfEditing(null);
             }}
-            onSaved={refresh}
-            onDirtyChange={setDocDirty}
-            onAI={() => setAi(true)}
+            onSaved={async (f) => {
+              await refresh();
+              setPdfEditing(f);
+              notify('Edited PDF copy saved');
+            }}
           />
         ) : doc?.content?.studioVersion === 1 ? (
           <StudioEditor
@@ -643,15 +658,14 @@ export default function App() {
             onSaved={refresh}
             onDirtyChange={setDocDirty}
           />
-        ) : doc && (integrations.office || doc.office) ? (
-          <NativeEditor
-            key={doc.id}
+        ) : doc?.office ? (
+          <CompatibleDocument
             doc={doc}
-            theme={theme}
             onClose={() => setDoc(null)}
-            onSaved={refresh}
-            onDirtyChange={setDocDirty}
-            onAI={() => setAi(true)}
+            onOpen={async (d) => {
+              await refresh();
+              setDoc(d);
+            }}
           />
         ) : doc ? (
           <Editor
@@ -951,92 +965,25 @@ export default function App() {
                   </>
                 )}
                 {page === 'hub' && (
-                  <>
-                    <div className="section-bar">
-                      <h2>Team knowledge</h2>
-                      <button
-                        className="button primary"
-                        onClick={() =>
-                          setModal({
-                            title: 'Publish to team space',
-                            fields: [
-                              { key: 'title', label: 'Title', required: true },
-                              projectField,
-                              {
-                                key: 'category',
-                                label: 'Category',
-                                type: 'select',
-                                options: ['Knowledge', 'Announcement', 'Policy'].map((v) => ({
-                                  value: v,
-                                  label: v,
-                                })),
-                                default: 'Knowledge',
-                              },
-                              {
-                                key: 'content',
-                                label: 'Content',
-                                type: 'textarea',
-                                required: true,
-                              },
-                            ],
-                            submit: (data) => mutate('pages', data),
-                          })
-                        }
-                      >
-                        <Plus size={16} /> New page
-                      </button>
-                    </div>
-                    <div className="knowledge-grid">
-                      {filtered(state.pages ?? []).map((p) => (
-                        <article className="knowledge-card" key={p.id}>
-                          <span className="knowledge-symbol">
-                            <BookOpen size={23} />
-                          </span>
-                          <Badge>{p.category}</Badge>
-                          <h2>{p.title}</h2>
-                          <p>{p.content}</p>
-                          <footer>
-                            <span>
-                              {users.find((u) => u.id === p.owner)?.name} · {niceDate(p.updated)}
-                            </span>
-                            {(p.owner === user.id || isManager) && (
-                              <button
-                                className="icon-button"
-                                aria-label={`Edit ${p.title}`}
-                                onClick={() =>
-                                  setModal({
-                                    title: 'Edit page',
-                                    initial: p,
-                                    fields: [
-                                      { key: 'title', label: 'Title', required: true },
-                                      projectField,
-                                      {
-                                        key: 'category',
-                                        label: 'Category',
-                                        type: 'select',
-                                        options: ['Knowledge', 'Announcement', 'Policy'].map(
-                                          (v) => ({ value: v, label: v }),
-                                        ),
-                                      },
-                                      {
-                                        key: 'content',
-                                        label: 'Content',
-                                        type: 'textarea',
-                                        required: true,
-                                      },
-                                    ],
-                                    submit: (data) => mutate('pages', data),
-                                  })
-                                }
-                              >
-                                <Settings2 size={16} />
-                              </button>
-                            )}
-                          </footer>
-                        </article>
-                      ))}
-                    </div>
-                  </>
+                  <TeamSpace
+                    pages={filtered(state.pages || [])}
+                    projects={projects}
+                    user={user}
+                    onSaved={refresh}
+                  />
+                )}
+                {page === 'organisation-map' && (
+                  <OrganisationGraph
+                    users={users}
+                    state={state}
+                    onConnect={async (id) => {
+                      await refresh();
+                      const url = new URL(location.href);
+                      url.searchParams.set('channel', id);
+                      history.replaceState(null, '', url);
+                      navigate('chat');
+                    }}
+                  />
                 )}
                 {page === 'projects' && (
                   <>
@@ -1224,16 +1171,7 @@ export default function App() {
                   />
                 )}
                 {page === 'timesheets' && (
-                  <Timesheets
-                    state={state}
-                    user={user}
-                    users={users}
-                    refresh={refresh}
-                    notify={notify}
-                  />
-                )}
-                {page === 'leave' && (
-                  <TimeOff
+                  <TimeWorkspace
                     state={state}
                     user={user}
                     users={users}
@@ -1290,7 +1228,7 @@ export default function App() {
           onClick={() => setAi(!ai)}
         >
           <Sparkles size={22} />
-          <span>Ask AI</span>
+          <span>Nova AI</span>
         </button>
         <CallNotifications user={user} notify={notify} />
         <Assistant
@@ -1433,7 +1371,10 @@ function Login({ setup, onLogin }: { setup: boolean; onLogin: (a: any) => void }
               e.preventDefault();
               setBusy(true);
               setError('');
-              const data = Object.fromEntries(new FormData(e.currentTarget));
+              const data = {
+                ...Object.fromEntries(new FormData(e.currentTarget)),
+                remember: new FormData(e.currentTarget).get('remember') === 'on',
+              };
               try {
                 onLogin(await api(setup ? '/setup' : '/login', 'POST', data));
               } catch (e) {
@@ -1489,6 +1430,12 @@ function Login({ setup, onLogin }: { setup: boolean; onLogin: (a: any) => void }
                 placeholder={setup ? 'At least 12 characters' : 'Your password'}
               />
             </label>
+            {!setup && (
+              <label className="check-field">
+                <input type="checkbox" name="remember" defaultChecked />
+                Keep me signed in for 30 days on this device
+              </label>
+            )}
             {error && (
               <div className="error" role="alert">
                 {error}
@@ -1960,18 +1907,13 @@ function PdfViewer({
         <iframe title="PDF preview" src={`/api/files/${file.id}/preview`} />
         <div>
           <h3>Review & sign</h3>
-          {integrations.office && (
+          {!file.signature && file.canEdit !== false && (
             <button className="button primary" onClick={onEdit}>
               <FileText size={16} />
-              Edit PDF · full editor
+              Edit PDF · annotations & pages
             </button>
           )}
-          {integrations.office && (
-            <p className="muted small">
-              Edit text and images, annotate, fill forms and organize pages. Save your changes
-              before returning here to sign.
-            </p>
-          )}
+
           <label>
             Signature type
             <select value={mode} onChange={(e) => setMode(e.target.value)}>

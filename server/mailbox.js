@@ -136,6 +136,30 @@ export function installMailIngress(app, { store, uploadDir, fail }) {
     }
   });
 }
+export function formattedMail(text) {
+  const escaped = String(text)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+  return (
+    '<div style="font-family:Arial,sans-serif;line-height:1.6">' +
+    escaped
+      .split('\n')
+      .map(
+        (line) =>
+          '<p>' +
+          line
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>') +
+          '</p>',
+      )
+      .join('') +
+    '</div>'
+  );
+}
 export function installMailbox(
   app,
   { store, fail, uploadDir, transportFactory = (options) => nodemailer.createTransport(options) },
@@ -241,6 +265,46 @@ export function installMailbox(
         .map(({ id, title, size, messageId }) => ({ id, title, size, messageId })),
     );
   });
+  app.post('/api/mail/:id/forward-attachments', (req, res) => {
+    const message = get(req),
+      files = (message.attachments || [])
+        .map((id) => store.get('mailAttachments', id))
+        .filter(Boolean);
+    const pending = store
+      .all('mailAttachments')
+      .filter((a) => a.owner === req.user.id && !a.messageId);
+    if (
+      pending.length + files.length > 20 ||
+      [...pending, ...files].reduce((n, a) => n + a.size, 0) > 20 * 1024 * 1024
+    )
+      fail(413, 'Pending attachments exceed 20 files / 20 MB');
+    const written = [];
+    try {
+      const copies = store.transaction(() =>
+        files.map((a) => {
+          const id = randomUUID();
+          writeFileSync(path.join(uploadDir, id), readFileSync(path.join(uploadDir, a.id)), {
+            flag: 'wx',
+          });
+          written.push(id);
+          return store.put(
+            'mailAttachments',
+            { title: a.title, size: a.size, messageId: '' },
+            req.user.id,
+            id,
+          );
+        }),
+      );
+      store.audit(req.user.id, 'mail.forward-attachments', message.id, { count: copies.length });
+      res.status(201).json(copies);
+    } catch (e) {
+      for (const id of written)
+        try {
+          unlinkSync(path.join(uploadDir, id));
+        } catch {}
+      throw e;
+    }
+  });
   app.delete('/api/mail/attachments/:id', (req, res) => {
     const a = store.get('mailAttachments', req.params.id);
     if (!a || a.owner !== req.user.id || a.messageId)
@@ -338,6 +402,7 @@ export function installMailbox(
           bcc,
           subject: data.subject,
           text: data.body,
+          html: formattedMail(data.body),
           envelope: { from: process.env.SMTP_FROM || req.user.email, to: external },
           attachments: attachments.map((a) => ({
             filename: a.title,

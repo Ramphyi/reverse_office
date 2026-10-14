@@ -132,6 +132,23 @@ export const FUNCTIONS = [
   'VLOOKUP',
   'INDEX',
   'MATCH',
+  'SUMIFS',
+  'COUNTIFS',
+  'AVERAGEIF',
+  'AVERAGEIFS',
+  'MEDIAN',
+  'STDEV.S',
+  'STDEV.P',
+  'PRODUCT',
+  'INT',
+  'SIGN',
+  'ISNUMBER',
+  'ISTEXT',
+  'COUNTBLANK',
+  'TEXTJOIN',
+  'SUBSTITUTE',
+  'REPT',
+  'XLOOKUP',
 ];
 export function calculate(workbook, sheetIndex, key, trail = new Set(), cache = new Map()) {
   const sheet = workbook.sheets[sheetIndex];
@@ -345,12 +362,111 @@ export function calculate(workbook, sheetIndex, key, trail = new Set(), cache = 
           return evalNode(n.args[1]);
         }
       }
+      if (name === 'XLOOKUP') {
+        if (n.args.length < 3 || n.args.length > 6) fail('#VALUE!');
+        if (n.args[4] && scalar(evalNode(n.args[4])) !== 0) fail('#N/A');
+        const mode = n.args[5] ? numeric(scalar(evalNode(n.args[5]))) : 1;
+        if (![1, -1].includes(mode)) fail('#N/A');
+        const value = scalar(evalNode(n.args[0])),
+          lookup = flat([evalNode(n.args[1])]),
+          result = flat([evalNode(n.args[2])]);
+        if (lookup.length !== result.length) fail('#VALUE!');
+        const indexes = lookup.map((_, i) => i);
+        if (mode === -1) indexes.reverse();
+        const index = indexes.find((i) => compare(lookup[i], value, '='));
+        if (index === undefined) {
+          if (n.args[3]) return evalNode(n.args[3]);
+          fail('#N/A');
+        }
+        return result[index];
+      }
       const args = n.args.map(evalNode),
         a = scalar(args[0]),
         b = scalar(args[1]),
         c = scalar(args[2]),
         nums = numbers(args);
       switch (name) {
+        case 'SUMIFS':
+        case 'COUNTIFS':
+        case 'AVERAGEIFS': {
+          const count = name === 'COUNTIFS',
+            start = count ? 0 : 1;
+          if (args.length < start + 2 || (args.length - start) % 2) fail('#VALUE!');
+          const range = flat([args[0]]),
+            pairs = [];
+          for (let i = start; i < args.length; i += 2) {
+            const r = flat([args[i]]);
+            if (r.length !== range.length) fail('#VALUE!');
+            pairs.push([r, scalar(args[i + 1])]);
+          }
+          const matching = range.filter((_, i) => pairs.every(([r, c]) => criterion(r[i], c)));
+          if (count) return matching.length;
+          const values = numbers(matching);
+          if (name === 'AVERAGEIFS' && !values.length) fail('#DIV/0!');
+          const sum = values.reduce((x, y) => x + y, 0);
+          return name === 'AVERAGEIFS' ? sum / values.length : sum;
+        }
+        case 'AVERAGEIF': {
+          if (args.length < 2 || args.length > 3) fail('#VALUE!');
+          const source = flat([args[0]]),
+            target = flat([args[2] ?? args[0]]);
+          if (source.length !== target.length) fail('#VALUE!');
+          const values = numbers(target.filter((_, i) => criterion(source[i], b)));
+          if (!values.length) fail('#DIV/0!');
+          return values.reduce((x, y) => x + y, 0) / values.length;
+        }
+        case 'MEDIAN': {
+          if (!nums.length) fail('#NUM!');
+          const sorted = [...nums].sort((a, b) => a - b),
+            i = Math.floor(sorted.length / 2);
+          return sorted.length % 2 ? sorted[i] : (sorted[i - 1] + sorted[i]) / 2;
+        }
+        case 'STDEV.S':
+        case 'STDEV.P': {
+          const divisor = nums.length - (name === 'STDEV.S' ? 1 : 0);
+          if (divisor <= 0) fail('#DIV/0!');
+          const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+          return Math.sqrt(nums.reduce((n, v) => n + (v - mean) ** 2, 0) / divisor);
+        }
+        case 'PRODUCT':
+          return nums.length ? nums.reduce((a, b) => a * b, 1) : 0;
+        case 'INT':
+          return Math.floor(numeric(a));
+        case 'SIGN':
+          return Math.sign(numeric(a));
+        case 'ISNUMBER':
+          return typeof a === 'number';
+        case 'ISTEXT':
+          return typeof a === 'string';
+        case 'COUNTBLANK':
+          return flat(args).filter((v) => v === '').length;
+        case 'TEXTJOIN': {
+          const value = flat(args.slice(2))
+            .filter((v) => !b || v !== '')
+            .join(String(a));
+          if (value.length > 32767) fail('#VALUE!');
+          return value;
+        }
+        case 'SUBSTITUTE': {
+          const text = String(a),
+            old = String(b),
+            replacement = String(c);
+          if (!old) return text;
+          const instance = args[3] === undefined ? null : numeric(scalar(args[3]));
+          if (instance !== null && (!Number.isInteger(instance) || instance < 1)) fail('#VALUE!');
+          let n = 0;
+          return text
+            .split(old)
+            .map((v, i) =>
+              i === 0 ? v : ((++n, instance === null || n === instance) ? replacement : old) + v,
+            )
+            .join('');
+        }
+        case 'REPT': {
+          const n = Math.floor(numeric(b));
+          if (n < 0 || String(a).length * n > 32767) fail('#VALUE!');
+          return String(a).repeat(n);
+        }
         case 'SUM':
           return nums.reduce((x, y) => x + y, 0);
         case 'AVERAGE':

@@ -38,6 +38,8 @@ export function Mailbox({
     [uploading, setUploading] = useState(false),
     [composeError, setComposeError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
+  const bodyInput = useRef<HTMLTextAreaElement>(null);
+  const [previewBody, setPreviewBody] = useState(false);
   const selectedId = useRef<string | null>(null);
   const reload = async () => {
     const [m, c] = await Promise.all([api('/mail'), api('/mail/config')]);
@@ -140,8 +142,15 @@ export function Mailbox({
       setBusy(false);
     }
   }
-  const reply = (forward: boolean) => {
+  const reply = async (forward: boolean) => {
     if (!selected) return;
+    let forwarded: Item[] = [];
+    try {
+      if (forward) forwarded = await api(`/mail/${selected.id}/forward-attachments`, 'POST', {});
+    } catch (e) {
+      setError((e as Error).message);
+      return;
+    }
     setCompose({
       to: forward ? '' : selected.from,
       cc: '',
@@ -151,7 +160,7 @@ export function Mailbox({
         .split('\n')
         .map((s: string) => '> ' + s)
         .join('\n')}`,
-      attachments: [],
+      attachments: forwarded,
     });
     setComposeError('');
   };
@@ -368,7 +377,22 @@ export function Mailbox({
                   type="button"
                   className="button secondary"
                   key={label}
-                  onClick={() => setCompose({ ...compose, body: compose.body + text })}
+                  onClick={() => {
+                    const input = bodyInput.current;
+                    const start = input?.selectionStart ?? compose.body.length,
+                      end = input?.selectionEnd ?? start;
+                    const marker = label === 'Bold' ? '**' : label === 'Italic' ? '*' : '`';
+                    setCompose({
+                      ...compose,
+                      body:
+                        compose.body.slice(0, start) +
+                        marker +
+                        (compose.body.slice(start, end) || 'text') +
+                        marker +
+                        compose.body.slice(end),
+                    });
+                    input?.focus();
+                  }}
                 >
                   {label}
                 </button>
@@ -383,9 +407,24 @@ export function Mailbox({
                 Attach files
               </button>
             </div>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setPreviewBody(!previewBody)}
+            >
+              {previewBody ? 'Hide preview' : 'Preview formatting'}
+            </button>
+            {previewBody && (
+              <div className="team-rich">
+                <Markdown remarkPlugins={[remarkGfm]} skipHtml components={{ img: () => null }}>
+                  {compose.body}
+                </Markdown>
+              </div>
+            )}
             <label>
               Message
               <textarea
+                ref={bodyInput}
                 aria-label="Message"
                 rows={10}
                 required
@@ -395,8 +434,8 @@ export function Mailbox({
               />
             </label>
             <small>
-              Markdown formatting is supported in the workspace. External email includes a
-              plain-text copy. Up to 20 MB of attachments.
+              Markdown formatting is supported in the workspace. External email includes safe
+              bold/italic/code formatting and a plain-text alternative. Up to 20 MB of attachments.
             </small>
             <input
               ref={fileInput}

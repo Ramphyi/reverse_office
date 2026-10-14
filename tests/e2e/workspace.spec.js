@@ -27,7 +27,7 @@ test('workspace setup, every module, editing, export, administration and persist
     'Team space',
     'Projects',
     'Timesheets',
-    'Time off',
+    'People map',
     'Reports',
     'Administration',
     'Mail',
@@ -84,7 +84,7 @@ test('workspace setup, every module, editing, export, administration and persist
   await page.getByLabel('Channel message').fill('Hello from the browser test');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Hello from the browser test')).toBeVisible();
-  await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
+  await page.getByRole('button', { name: 'Nova AI', exact: true }).click();
   await page.getByLabel('Message to assistant').fill('find budget');
   await page.getByRole('button', { name: 'Send to assistant' }).click();
   await expect(

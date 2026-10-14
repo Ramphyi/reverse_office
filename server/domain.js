@@ -127,7 +127,8 @@ export const schemas = {
   folders: z.object({ ...base, parentId: z.string().default('') }),
   pages: z.object({
     ...base,
-    content: z.string().max(100000),
+    content: z.string().max(3500000),
+    format: z.enum(['text', 'html']).default('text'),
     category: z.enum(['Knowledge', 'Announcement', 'Policy']).default('Knowledge'),
   }),
   mail: z.object({ to: z.string().email(), subject: text, body: z.string().min(1).max(50000) }),

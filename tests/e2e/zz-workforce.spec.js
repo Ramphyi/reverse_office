@@ -50,7 +50,8 @@ test('organisation onboarding, member security, shared leave/calendar, weekly ho
     await member.getByLabel('Display name').fill('Taylor Calendar Updated');
     await member.getByRole('button', { name: 'Save profile' }).click();
     await expect(member.locator('.sidebar-user')).toContainText('Taylor Calendar Updated');
-    await member.locator('nav').getByRole('button', { name: 'Time off', exact: true }).click();
+    await member.locator('nav').getByRole('button', { name: 'Timesheets', exact: true }).click();
+    await member.getByRole('button', { name: 'Time off', exact: true }).click();
     await member.getByLabel('Work calendar month').fill('2027-03');
     await member.getByRole('button', { name: 'Work day 2027-03-16', exact: true }).click();
     await member.getByRole('button', { name: 'Request time off on this day' }).click();
@@ -59,9 +60,11 @@ test('organisation onboarding, member security, shared leave/calendar, weekly ho
     await expect(
       member.getByRole('button', { name: 'Work day 2027-03-16', exact: true }),
     ).toContainText('Pending');
-    await page.locator('nav').getByRole('button', { name: 'Time off', exact: true }).click();
+    await page.locator('nav').getByRole('button', { name: 'Timesheets', exact: true }).click();
+    await page.getByRole('button', { name: 'Time off', exact: true }).click();
     await page.reload();
-    await page.locator('nav').getByRole('button', { name: 'Time off', exact: true }).click();
+    await page.locator('nav').getByRole('button', { name: 'Timesheets', exact: true }).click();
+    await page.getByRole('button', { name: 'Time off', exact: true }).click();
     await page.getByLabel('Leave year', { exact: true }).selectOption('2027');
     await page
       .getByRole('row')
