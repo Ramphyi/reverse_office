@@ -172,6 +172,10 @@
 .ro-notes textarea {
   min-height: 70px;
 }
+:root[data-theme='dark'] .ro-response {
+  background: var(--surface-raised);
+  color: var(--text);
+}
 .ro-response {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

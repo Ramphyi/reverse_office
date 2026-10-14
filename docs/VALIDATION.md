@@ -55,4 +55,6 @@ The Vite build currently emits a large-bundle advisory for the combined editor b
 
 ## Romania branch
 
+Office Studio upgrade, 2026-10-14: the Romania branch passed the production build, **34/34 backend tests, 3/3 workspace/Romania browser flows and 2/2 native Office browser flows** against the actual Document Server. These include the native editing, export, image insertion and two-account collaboration checks described above. ANAF remains simulated. The base image also passed a fresh hardened-container setup and actual native spreadsheet-to-PDF conversion through Document Server.
+
 After the baseline commit, `feature/romania-spv` passed **26/26 backend tests and 3/3 browser flows**. The `reverse-office:romania` Docker image built and passed authenticated billing writes under non-root/read-only execution. Printing generated `artifacts/invoice.pdf`; desktop/mobile screenshots are `artifacts/billing.png` and `artifacts/billing-mobile.png`. SPV/OAuth tests use an injected simulator and never contact ANAF. See [Romania workflow and evidence](ROMANIA.md).
