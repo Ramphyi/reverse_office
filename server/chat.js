@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { writeFileSync, readFileSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { installChatSpaces, chatDirectory, monitoringNotice } from './chat-spaces.js';
 
 export function imageType(bytes) {
   if (
@@ -24,6 +25,7 @@ export function imageType(bytes) {
   return '';
 }
 export function installChat(app, { store, readable, session, uploadDir, fail }) {
+  installChatSpaces(app, { store, readable, session, uploadDir, fail });
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 25 * 1024 * 1024, files: 1, fields: 2 },
@@ -41,7 +43,7 @@ export function installChat(app, { store, readable, session, uploadDir, fail }) 
   }
   app.post('/api/chat/direct', (req, res) => {
     const { userId } = z.object({ userId: z.string().min(1).max(100) }).parse(req.body);
-    const other = store.users().find((u) => u.id === userId && u.active);
+    const other = chatDirectory(store, req.user, readable).find((u) => u.id === userId && u.active);
     if (!other || other.id === req.user.id) fail(400, 'Choose another active team member');
     const ids = [req.user.id, other.id].sort();
     const existing = store
@@ -55,7 +57,7 @@ export function installChat(app, { store, readable, session, uploadDir, fail }) 
       {
         title: 'Private conversation',
         projectId: '',
-        description: 'Only the two participants can access this conversation.',
+        description: 'Direct conversation. ' + monitoringNotice,
         visibility: 'direct',
         memberIds: ids,
       },
