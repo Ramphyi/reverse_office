@@ -29,7 +29,7 @@ Explicit shares grant **view/download only**. Regular recipients cannot edit, de
 
 ## Mail
 
-Mail has Inbox, Sent, Drafts, Starred and Trash, search, per-user read/star/trash state, To/CC/BCC, draft editing, reply, forward of message text, and upload/download of attachments. Markdown formatting is rendered inside the workspace; external messages use plain text. Forwarded attachments must currently be attached separately. Drafts are private; recipients never receive the BCC list or SMTP recipient diagnostics. File downloads require message access. Maximum outgoing attachments: 20 files / 20 MB total, 10 MB per file.
+Mail has Inbox, Sent, Drafts, Starred and Trash, search, per-user read/star/trash state, To/CC/BCC, draft editing, reply, forwarding with separate attachment copies, and upload/download of attachments. Compose provides bold/italic/code controls and a formatting preview. External messages include escaped, limited HTML formatting plus a plain-text alternative. Forwarded files become private copies owned by the forwarder before sending. Drafts are private; recipients never receive the BCC list or SMTP recipient diagnostics. File downloads require message access. Maximum outgoing attachments: 20 files / 20 MB total, 10 MB per file.
 
 Internal delivery works between active internal accounts without an external service. External guests are external email addresses, not local mailboxes. Deleting/trashing a user's copy does not delete another recipient's copy. Trash can be restored; this is not a retention/e-discovery implementation.
 

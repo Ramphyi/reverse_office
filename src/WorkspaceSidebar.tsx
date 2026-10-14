@@ -163,7 +163,7 @@ export function WorkspaceSidebar({
             );
           })}
       </nav>
-      <button className="sidebar-ai" onClick={onAi} title="Ask AI">
+      <button className="sidebar-ai" onClick={onAi} title="Nova AI">
         <Sparkles size={19} />
         <div className="sidebar-label">
           <strong>A little momentum</strong>

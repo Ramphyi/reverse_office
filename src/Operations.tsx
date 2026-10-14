@@ -1,3 +1,5 @@
+import { ConnectorSettings } from './AssistantOutputs';
+import { CostManagement } from './WorkspaceExperience';
 import { TimeEntry } from './TimeEntry';
 import { AISettings } from './AISettings';
 import { WorkCalendar } from './WorkCalendar';
@@ -41,6 +43,22 @@ type Props = {
   notify: (text: string) => void;
 };
 const isManager = (user: User) => ['admin', 'manager'].includes(user.role);
+export function TimeWorkspace(props: Props) {
+  const [view, setView] = useState('time');
+  return (
+    <>
+      <div className="tabs attendance-tabs">
+        <button className={view === 'time' ? 'active' : ''} onClick={() => setView('time')}>
+          Time entries
+        </button>
+        <button className={view === 'leave' ? 'active' : ''} onClick={() => setView('leave')}>
+          Time off
+        </button>
+      </div>
+      {view === 'time' ? <Timesheets {...props} /> : <TimeOff {...props} />}
+    </>
+  );
+}
 export function Timesheets({ state, user, users, refresh, notify }: Props) {
   const [editing, setEditing] = useState<Item | null>(null),
     [tab, setTab] = useState('mine'),
@@ -727,6 +745,9 @@ export function Admin({
           { id: 'people', name: 'People', Icon: Users },
           { id: 'organisation', name: 'Organisation', Icon: Settings2 },
           { id: 'ai', name: 'AI settings', Icon: Settings2 },
+          ...(user.role === 'admin'
+            ? [{ id: 'costs', name: 'Compensation & costs', Icon: Activity }]
+            : []),
           { id: 'calendars', name: 'Calendars', Icon: CalendarDays },
           { id: 'entitlements', name: 'Leave allowances', Icon: Clock3 },
           ...(user.role === 'admin' ? [{ id: 'audit', name: 'Audit log', Icon: ShieldCheck }] : []),
@@ -744,7 +765,15 @@ export function Admin({
       {tab === 'organisation' && (
         <Organisation state={state} user={user} users={users} refresh={refresh} notify={notify} />
       )}
-      {tab === 'ai' && <AISettings admin={user.role === 'admin'} />}
+      {tab === 'ai' && (
+        <>
+          <AISettings admin={user.role === 'admin'} />
+          {user.role === 'admin' && <ConnectorSettings />}
+        </>
+      )}
+      {tab === 'costs' && user.role === 'admin' && (
+        <CostManagement users={users} projects={state.projects || []} />
+      )}
       {tab === 'calendars' && (
         <>
           <div className="section-bar">

@@ -1,3 +1,5 @@
+import { installPdfWorkspace } from './pdf-workspace.js';
+import { installInsights, compensationSchema } from './workspace-insights.js';
 import { installMailbox, installMailIngress, canReadMail, publicMail } from './mailbox.js';
 import { drivePermission, installDriveSharing } from './drive-sharing.js';
 import { installChatInvites, chatDirectory } from './chat-spaces.js';
@@ -113,7 +115,11 @@ export function createApp({
     limits: { fileSize: 25 * 1024 * 1024, files: 1 },
   });
   app.get('/api/health', (req, res) =>
-    res.json({ status: 'ok', preview: process.env.PREVIEW_MODE === 'true' }),
+    res.json({
+      status: 'ok',
+      build: '2026.10.14-workspace-2',
+      preview: process.env.PREVIEW_MODE === 'true',
+    }),
   );
   app.get('/api/setup', (req, res) => res.json({ required: store.users().length === 0 }));
   function session(req) {
@@ -125,18 +131,19 @@ export function createApp({
       )
       .get(digest(token), Date.now());
   }
-  function signIn(res, user) {
+  function signIn(res, user, remember = false) {
+    const duration = (remember ? 30 * 24 : 8) * 3600000;
     const token = randomBytes(32).toString('hex'),
       csrf = randomBytes(24).toString('hex');
     store.db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());
     store.db
       .prepare('INSERT INTO sessions VALUES (?,?,?,?)')
-      .run(digest(token), user.id, csrf, Date.now() + 8 * 3600000);
+      .run(digest(token), user.id, csrf, Date.now() + duration);
     res.cookie(sessionCookie, token, {
       httpOnly: true,
       sameSite: 'strict',
       secure: process.env.COOKIE_SECURE === 'true',
-      maxAge: 8 * 3600000,
+      maxAge: duration,
       path: '/',
     });
     return { user: publicUser(user), csrf };
@@ -162,7 +169,8 @@ export function createApp({
     );
     if (!user || !valid) fail(401, 'Incorrect email or password');
     store.audit(user.id, 'login', 'session');
-    res.json(signIn(res, user));
+    const remember = z.boolean().default(false).parse(req.body.remember);
+    res.json(signIn(res, user, remember));
   });
   installMailIngress(app, { store, uploadDir, fail });
   installChatInvites(app, { store, fail, signIn, loginLimit });
@@ -457,6 +465,8 @@ export function createApp({
       fail(413, 'Document is too large');
   }
   workforce.install(app, { validateRefs, credentialLimit: loginLimit });
+  installInsights(app, { store, workforce, fail });
+  installPdfWorkspace(app, { store, readable, writable, office, uploadDir, fail });
   installDriveSharing(app, { store, readable, visible, fail });
   const chat = installChat(app, { store, readable, session, uploadDir, fail });
   app.get('/api/users', (req, res) =>
@@ -501,6 +511,7 @@ export function createApp({
         projectIds: z.array(z.string()).max(100).default([]),
         allowance: z.number().min(0).max(366).optional(),
         allowanceYear: z.number().int().min(2000).max(2200).optional(),
+        compensation: compensationSchema.omit({ userId: true, projectId: true }).optional(),
       })
       .parse(req.body);
     validateManager(data.managerId);
@@ -545,6 +556,13 @@ export function createApp({
             calendarId: data.calendarId || workforce.organisation().calendarId,
           },
           req.user.id,
+        );
+      if (data.compensation)
+        store.put(
+          'compensation',
+          { ...data.compensation, userId: u.id, projectId: '' },
+          req.user.id,
+          `pay:${u.id}::${data.compensation.effective}`,
         );
       store.audit(req.user.id, 'account.create', u.id, { role: u.role, managerId: data.managerId });
       return store.users().find((v) => v.id === u.id);
@@ -992,7 +1010,16 @@ export function createApp({
     }),
   );
   installAISettings(app, aiSettings, store);
-  installAssistant(app, { store, readable, visible, office, safeImport, fail, aiSettings });
+  installAssistant(app, {
+    store,
+    readable,
+    visible,
+    office,
+    safeImport,
+    fail,
+    aiSettings,
+    workforce,
+  });
   app.get('/api/rtc-config', (req, res) =>
     res.json({
       iceServers: process.env.TURN_URL
@@ -1013,8 +1040,16 @@ export function createApp({
     app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint not found' }));
     const dist = path.resolve('dist');
     if (existsSync(dist)) {
-      app.use(express.static(dist));
-      app.get('/{*path}', (req, res) => res.sendFile(path.join(dist, 'index.html')));
+      app.use(
+        express.static(dist, {
+          setHeaders(res, file) {
+            if (file.endsWith('.html')) res.set('Cache-Control', 'no-store');
+          },
+        }),
+      );
+      app.get('/{*path}', (req, res) =>
+        res.set('Cache-Control', 'no-store').sendFile(path.join(dist, 'index.html')),
+      );
     }
     app.use((error, req, res, next) => {
       if (res.headersSent) return next(error);

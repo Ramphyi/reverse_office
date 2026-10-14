@@ -1,3 +1,7 @@
+import { formattedMail } from '../server/mailbox.js';
+import { PDFDocument } from 'pdf-lib';
+import { attendanceAlerts } from '../server/workspace-insights.js';
+import { initWorkforce } from '../server/workforce.js';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -394,4 +398,155 @@ test('SMTP failure preserves local delivery and an explicit uncertain external s
     smtpFailure = false;
     delete process.env.SMTP_HOST;
   }
+});
+
+test('remembered login lasts 30 days and logout revokes that session', async () => {
+  const r = await req('/login', {
+    who: null,
+    method: 'POST',
+    body: { email: admin.user.email, password, remember: true },
+  });
+  assert.equal(r.status, 200);
+  assert.match(r.response.headers.get('set-cookie'), /Max-Age=2592000/);
+  assert.match(r.response.headers.get('set-cookie'), /HttpOnly/);
+  const who = { ...r.data, cookie: r.response.headers.get('set-cookie').split(';')[0] };
+  assert.equal((await req('/me', { who })).status, 200);
+  await req('/logout', { who, method: 'POST', body: {} });
+  assert.equal((await req('/me', { who })).status, 401);
+});
+test('effective compensation is private and project overrides drive actual recorded-time costs', async () => {
+  const value = {
+    userId: member.user.id,
+    effective: '2026-01-01',
+    basis: 'monthly',
+    amount: 6400,
+    monthlyHours: 160,
+    currency: 'EUR',
+    clientRate: 90,
+  };
+  assert.equal(
+    (await req('/compensation', { who: member, method: 'POST', body: value })).status,
+    403,
+  );
+  const a = await req('/compensation', { method: 'POST', body: value });
+  assert.equal(a.status, 201);
+  const b = await req('/compensation', {
+    method: 'POST',
+    body: { ...value, projectId: project.id, effective: '2026-11-01', basis: 'hourly', amount: 55 },
+  });
+  assert.equal(b.status, 201);
+  const report = await req('/cost-report?month=2026-11');
+  assert.equal(report.status, 200);
+  const row = report.data.rows.find((r) => r.userId === member.user.id);
+  assert.equal(row.hourly, 55);
+  assert.equal(row.cost, row.hours * 55);
+  assert.equal((await req('/cost-report?month=2026-11', { who: member })).status, 403);
+  assert.equal((await req('/entities/compensation', { who: member })).status, 404);
+  assert.equal((await req('/state', { who: member })).data.compensation, undefined);
+  assert.equal((await req('/compensation', { method: 'POST', body: value })).status, 409);
+});
+test('attendance reminders exclude approved leave and weekends and never expose unrelated employees', () => {
+  const workforce = initWorkforce(runtime.store);
+  runtime.store.db
+    .prepare('UPDATE users SET created=? WHERE id=?')
+    .run('2020-01-01T00:00:00Z', member.user.id);
+  const before = attendanceAlerts(runtime.store, workforce, member.user, '2026-10-09');
+  assert.ok(before.length > 0);
+  assert.ok(before.every((a) => a.userId === member.user.id));
+  runtime.store.put(
+    'leave',
+    {
+      userId: member.user.id,
+      start: '2026-10-09',
+      end: '2026-10-09',
+      calendarId: 'default',
+      status: 'Approved',
+      type: 'Annual',
+    },
+    admin.user.id,
+  );
+  const after = attendanceAlerts(runtime.store, workforce, member.user, '2026-10-09');
+  assert.ok(!after.some((a) => a.date === '2026-10-09'));
+  assert.ok(!after.some((a) => [0, 6].includes(new Date(a.date + 'T00:00:00Z').getUTCDay())));
+});
+test('independent PDF edits preserve source bytes, rotate copies and enforce ownership', async () => {
+  const pdf = await PDFDocument.create();
+  pdf.addPage([300, 400]);
+  pdf.addPage([300, 400]);
+  const source = await pdf.save();
+  const form = new FormData();
+  form.append('file', new Blob([source], { type: 'application/pdf' }), 'original.pdf');
+  const file = (await req('/files', { method: 'POST', body: form })).data;
+  assert.equal((await req('/files/' + file.id + '/pdf-info')).data.pages.length, 2);
+  const edited = await req('/files/' + file.id + '/pdf-edit', {
+    method: 'POST',
+    body: { page: 1, action: 'rotate' },
+  });
+  assert.equal(edited.status, 201);
+  assert.notEqual(edited.data.id, file.id);
+  const copy = await PDFDocument.load(
+    (await req('/files/' + edited.data.id + '/download', { raw: true })).data,
+  );
+  assert.equal(copy.getPage(0).getRotation().angle, 90);
+  assert.deepEqual(
+    (await req('/files/' + file.id + '/download', { raw: true })).data,
+    Buffer.from(source),
+  );
+  assert.equal(
+    (
+      await req('/files/' + file.id + '/pdf-edit', {
+        who: member,
+        method: 'POST',
+        body: { page: 1, action: 'remove' },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await req('/files/' + file.id + '/pdf-edit', {
+        method: 'POST',
+        body: { page: 99, action: 'rotate' },
+      })
+    ).status,
+    400,
+  );
+});
+
+test('forwarded mail attachments are copied under the forwarding user and isolated until sent', async () => {
+  const message = (await req('/mail', { who: member })).data.find(
+    (m) => m.attachments?.length && m.status !== 'Draft' && !m.incoming,
+  );
+  assert.ok(message);
+  const forward = await req('/mail/' + message.id + '/forward-attachments', {
+    who: member,
+    method: 'POST',
+    body: {},
+  });
+  assert.equal(forward.status, 201);
+  assert.equal(forward.data.length, 1);
+  assert.notEqual(forward.data[0].id, message.attachments[0]);
+  assert.equal((await req('/mail/attachments/' + forward.data[0].id)).status, 403);
+  const sent = await req('/mail', {
+    who: member,
+    method: 'POST',
+    body: {
+      to: admin.user.email,
+      subject: 'Forwarded proposal',
+      body: 'Review the attachment',
+      attachments: [forward.data[0].id],
+    },
+  });
+  assert.equal(sent.status, 201);
+  assert.equal(
+    (await req('/mail/attachments/' + forward.data[0].id, { raw: true })).data.toString(),
+    'mail attachment',
+  );
+});
+test('external email formatting escapes markup and only introduces safe text formatting', () => {
+  const html = formattedMail('**Hello** <script>alert(1)</script> *team* `code`');
+  assert.match(html, /<strong>Hello<\/strong>/);
+  assert.match(html, /&lt;script&gt;/);
+  assert.ok(!html.includes('<script>'));
+  assert.match(html, /<em>team<\/em>/);
 });

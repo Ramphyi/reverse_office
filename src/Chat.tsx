@@ -89,7 +89,9 @@ export function Chat({
     [review, setReview] = useState(false),
     [scope, setScope] = useState('all'),
     [filter, setFilter] = useState('');
-  const [channel, setChannel] = useState<string>(state.channels?.[0]?.id ?? ''),
+  const [channel, setChannel] = useState<string>(
+      () => new URLSearchParams(location.search).get('channel') || state.channels?.[0]?.id || '',
+    ),
     [messages, setMessages] = useState<Item[]>(state.messages ?? []),
     [channels, setChannels] = useState<Item[]>(state.channels ?? []),
     [attachments, setAttachments] = useState<Item[]>([]),

@@ -15,3 +15,5 @@ import './workspace-controls.css';
 import './chat.css';
 
 import './productivity.css';
+
+import './workspace-experience.css';

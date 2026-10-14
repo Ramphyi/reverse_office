@@ -2,6 +2,8 @@
 
 Original implementation: MIT. No new npm dependencies were added.
 
+The company assistant is now **Nova**. See [the current workspace guide](WORKSPACE-EXPERIENCE.md#nova-tools-and-configuration) for its 13 tools, charts, attendance reminders and operator-configured web/MCP integrations. The original standalone Studio controls described below remain separate.
+
 ## Where features run
 
 | Feature                                              | Standalone Studio (`:3002`)                | Company application                           |

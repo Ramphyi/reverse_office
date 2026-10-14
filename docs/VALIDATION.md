@@ -1,5 +1,17 @@
 # Executed validation
 
+## Independent workspace experience — 2026-10-14
+
+Main passes the production TypeScript/Vite build, **83/83 backend tests**, **9/9 company browser scenarios** and **12/12 original Studio browser scenarios**. The Studio scenarios also pass against the rebuilt `scratch` Docker artifact on port 3002. Its source allowlist audit reports 11 original MIT components and zero issues; the full company image remains blocked and was not rebuilt.
+
+New coverage verifies thirty-day remembered cookies and revocation, administrator-only effective compensation/project overrides, calendar-aware attendance visibility, independent PDF copies and page validation, forwarding private mail-attachment copies, safe external HTML formatting, chart output from authorized cells, MCP configuration/role/tool restrictions and live SSE result parsing/session cleanup. Added spreadsheet functions are exercised with conditional totals, exact lookup, statistics and bounded text.
+
+The company browser flow publishes/reloads a page with an embedded image, persists accent settings and a salary, opens the organisation graph, imports an earlier native file as a separate Studio copy while comparing original DOCX bytes, rotates a PDF into a new file, switches unified time tabs, restores a remembered session and opens full-width Connect without the main sidebar. Existing account, sharing, mailbox, project, live chat and two-user WebRTC scenarios pass. Screenshots of the graph, Connect window and PDF controls were inspected; headless Chromium does not verify the native PDF viewer's rendered page pixels. API tests inspect resulting PDF bytes/page geometry.
+
+Testing found and corrected the Nova launcher's overlap with Connect Send, a corrupt image fixture, a wrong legacy template fixture, a PDF control's missing exact accessible label and a fixed-port gateway test collision. The final Studio run uses an isolated ephemeral test gateway without touching the operator gateway. One earlier Studio run produced an empty initial page; the final development-host and Docker-host runs both passed all 12 scenarios without retries.
+
+Provider/MCP/SMTP behavior uses deterministic fixtures. Live Brave searches, external MCP credentials, real mailbox delivery, model quality, Teams/Google federation, production certificate trust and ANAF live acceptance are not covered. Office/Acrobat parity and the strict full-suite licensing migration remain incomplete. See [current behavior and setup](WORKSPACE-EXPERIENCE.md).
+
 ## Workforce and usability upgrade — 2026-10-14
 
 The base branch passed the production build, **31/31 backend tests, 3/3 workspace browser flows and 3/3 native Office browser flows**. Six new backend tests cover organisation permissions/versioning, atomic onboarding, temporary-password restrictions, password reset/session revocation, cross-year calendars, work/leave conflicts, cancellation, atomic weekly batches and employee data privacy. The new browser flow creates an organisation and employee, replaces the temporary password, changes the profile, approves leave, verifies the same leave in Timesheets, fills a five-day week and checks synchronized totals, dark appearance and 390px layout.
@@ -60,7 +72,6 @@ Screenshots are saved locally in ignored `artifacts/dashboard.png`, `artifacts/m
 External AI model output, external SMTP delivery, production certificate trust/revocation/timestamping, storage disaster recovery and ANAF test/live acceptance require environment-specific credentials and were not claimed as tested. The base branch does not contain billing. The Romania branch records its additional validation separately.
 
 The Vite build currently emits a large-bundle advisory for the combined editor bundle and non-fatal upstream comment annotations. These are recorded warnings, not build failures. Node 22 marks its SQLite module experimental; test coverage and pinned runtime requirements are included.
-
 
 ## Productivity workflows — 2026-10-14
 

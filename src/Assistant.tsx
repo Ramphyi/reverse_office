@@ -1,3 +1,5 @@
+import { Mascot } from './WorkspaceExperience';
+import { AssistantOutputs } from './AssistantOutputs';
 import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -177,11 +179,11 @@ export function Assistant({
         className="assistant-drag-handle"
       >
         <div className="assistant-logo">
-          <Sparkles size={20} />
+          <Mascot busy={busy} />
         </div>
         <div className="assistant-brand">
           <strong>
-            Ask AI<span>WORKSPACE COPILOT</span>
+            Nova<span>WORKSPACE ASSISTANT</span>
           </strong>
           <small>
             <i className={service.ai ? 'online-dot' : 'search-dot'} />
@@ -339,7 +341,21 @@ export function Assistant({
               </details>
             )}
             <div className="ai-markdown">
-              <Markdown remarkPlugins={[remarkGfm]}>{m.text}</Markdown>
+              <Markdown
+                remarkPlugins={[remarkGfm]}
+                skipHtml
+                components={{
+                  img: () => null,
+                  a: ({ children, href }) => (
+                    <a href={href} target="_blank" rel="noreferrer">
+                      {children}
+                    </a>
+                  ),
+                }}
+              >
+                {m.text}
+              </Markdown>
+              <AssistantOutputs artifacts={m.artifacts} />
             </div>
             {m.sources?.length > 0 && (
               <details className="ai-citations">

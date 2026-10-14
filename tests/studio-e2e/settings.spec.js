@@ -42,12 +42,20 @@ test('OpenAI settings pair with the real gateway, select a model and keep keys o
       },
     },
   });
-  gateway.server.listen(3210, '127.0.0.1');
+  gateway.server.listen(0, '127.0.0.1');
   await new Promise((resolve, reject) => {
     gateway.server.once('listening', resolve);
     gateway.server.once('error', reject);
   });
   try {
+    // Isolate the real test gateway from any operator gateway already using 3210.
+    const gatewayOrigin = `http://127.0.0.1:${gateway.server.address().port}`;
+    await page.route('http://127.0.0.1:3210/**', async (route) => {
+      const response = await route.fetch({
+        url: route.request().url().replace('http://127.0.0.1:3210', gatewayOrigin),
+      });
+      await route.fulfill({ response });
+    });
     await page.goto('/');
     await page.getByRole('button', { name: /Writer From/ }).click();
     await page.getByRole('textbox', { name: 'Document body' }).fill('Revenue is 420.');

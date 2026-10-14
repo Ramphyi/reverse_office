@@ -248,6 +248,29 @@ export function People({
                     ? [
                         { key: 'email', label: 'Work email', type: 'email', required: true },
                         {
+                          key: 'salary',
+                          label: 'Monthly salary / employer cost (optional)',
+                          type: 'number',
+                          min: 0,
+                          max: 10000000,
+                          step: '0.01',
+                        },
+                        { key: 'salaryCurrency', label: 'Salary currency', default: 'EUR' },
+                        {
+                          key: 'salaryEffective',
+                          label: 'Salary effective from',
+                          type: 'date',
+                          default: new Date().toISOString().slice(0, 10),
+                        },
+                        {
+                          key: 'salaryHours',
+                          label: 'Monthly hours for cost allocation',
+                          type: 'number',
+                          min: 1,
+                          max: 744,
+                          default: 160,
+                        },
+                        {
                           key: 'password',
                           label: 'Initial password (minimum 12 characters)',
                           type: 'password',
@@ -284,7 +307,21 @@ export function People({
               await api(`/users/${form.id}/reset-password`, 'POST', data);
               notify('Temporary password set. The user must replace it at next sign-in.');
             } else if (form.mode === 'create') {
-              await api('/users', 'POST', data);
+              await api('/users', 'POST', {
+                ...data,
+                ...(data.salary !== '' && data.salary !== undefined
+                  ? {
+                      compensation: {
+                        basis: 'monthly',
+                        amount: data.salary,
+                        currency: data.salaryCurrency.toUpperCase(),
+                        effective: data.salaryEffective,
+                        monthlyHours: data.salaryHours,
+                        clientRate: null,
+                      },
+                    }
+                  : {}),
+              });
               notify('Account created. Share the temporary password securely.');
             } else {
               await api(`/users/${form.id}`, 'PATCH', data);
