@@ -83,6 +83,8 @@ The Vite build currently emits a large-bundle advisory for the combined editor b
 
 ## Romania branch
 
+Public project page and guide, 2026-10-14: production build, **92/92 backend tests and 12/12 browser scenarios** pass. Public routes, bilingual tutorial, per-account progress and actual module launch behavior coexist with the invoice/UBL/payment flow. No live ANAF request was made.
+
 Independent workspace upgrade, 2026-10-14: **92/92 backend tests and 10/10 company/Romania browser scenarios** pass after the production build. Salary privacy, remembered sessions, native-copy preservation, PDF copies, rich pages, Nova tools and the existing invoice/UBL/payment flow are included. A timing-sensitive chat assertion was corrected to inspect the delivered article separately and wait for the composer to clear. ANAF calls remain simulated; no live submission or full-company Docker rebuild was performed.
 
 Workforce upgrade, 2026-10-14: **40/40 backend tests, 4/4 workspace/Romania browser flows and 3/3 native Office browser flows** passed on `feature/romania-spv`. The base release image passed isolated non-root/read-only container checks for organisation updates, account creation, mandatory password replacement, weekly time entries, shared calendar totals and actual native spreadsheet-to-PDF conversion. Billing/ANAF remains isolated to this branch; no real ANAF submission was made.
