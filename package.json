@@ -15,7 +15,9 @@
     "check": "npm run build && npm test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:office": "playwright test --config playwright.office.config.js"
+    "test:office": "playwright test --config playwright.office.config.js",
+    "license:report": "node scripts/license-audit.mjs",
+    "license:check": "node scripts/license-audit.mjs --check"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",
@@ -59,5 +61,6 @@
   "overrides": {
     "image-size": "2.0.4",
     "uuid": "11.1.1"
-  }
+  },
+  "license": "MIT"
 }

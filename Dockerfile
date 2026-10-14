@@ -1,6 +1,9 @@
 FROM node:22.18.0-bookworm-slim AS build
 WORKDIR /app
 COPY package*.json ./
+COPY license-policy.json ./
+COPY scripts/license-audit.mjs ./scripts/license-audit.mjs
+RUN node scripts/license-audit.mjs --check --no-write
 RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build && npm prune --omit=dev

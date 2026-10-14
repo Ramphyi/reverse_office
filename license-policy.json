@@ -1,0 +1,38 @@
+{
+  "allowedLicenses": ["MIT", "Apache-2.0"],
+  "scope": "Every distributed component, including transitive application dependencies, bundled assets, editor services, container OS packages and runtime dependencies. No implicit BSD, ISC, OFL, public-domain, MIT-0 or other exceptions.",
+  "status": "blocked",
+  "reason": "The current Node/Debian/ONLYOFFICE architecture does not satisfy this policy. No complete replacement artifact has been implemented or audited.",
+  "externalComponents": [
+    {
+      "name": "ONLYOFFICE Document Server 10.0.0",
+      "license": "AGPL-3.0-only",
+      "evidence": "compose.yaml documentserver; https://github.com/ONLYOFFICE/DocumentServer",
+      "action": "Replace the complete editor service. Preserve native files and revisions until a safe migration is available."
+    },
+    {
+      "name": "Node.js 22.18.0 bundled third-party code",
+      "license": "REVIEW-REQUIRED",
+      "evidence": "Installed /usr/local/LICENSE; https://github.com/nodejs/node/blob/v22.18.0/LICENSE",
+      "action": "Replace or comprehensively rebuild/audit the runtime. Its top-level MIT license does not replace embedded BSD, ISC and other notices."
+    },
+    {
+      "name": "GNU libc in node:22.18.0-bookworm-slim",
+      "license": "LGPL-2.1-or-later",
+      "evidence": "Installed /usr/share/doc/libc6/copyright",
+      "action": "Replace the distribution/runtime architecture; changing only the editor cannot fix this."
+    },
+    {
+      "name": "Debian dash shell",
+      "license": "BSD-3-Clause",
+      "evidence": "Installed /usr/share/doc/dash/copyright (additional file-specific notices also present)",
+      "action": "Exclude this shell from any strict release artifact."
+    },
+    {
+      "name": "Remaining container packages, embedded code, data assets and optional service images",
+      "license": "REVIEW-REQUIRED",
+      "evidence": "Dockerfile, compose.yaml, deploy manifests and installed package/asset notices",
+      "action": "Audit the complete final artifact, including bundled fonts, certificates, static data, vendored code and optional services. This manifest is a blocker list, not a complete SBOM."
+    }
+  ]
+}
