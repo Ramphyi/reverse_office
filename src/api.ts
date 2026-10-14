@@ -9,6 +9,7 @@ export type User = {
   department?: string;
   jobTitle?: string;
   calendarId?: string;
+  managerId?: string;
 };
 export type State = Record<string, Item[]>;
 let csrf = '';

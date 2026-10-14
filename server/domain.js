@@ -92,8 +92,24 @@ export const schemas = {
     carryLimit: z.number().min(0).max(366).default(5),
     calendarId: z.string().default('default'),
   }),
-  channels: z.object({ title: text, projectId, description: z.string().max(1000).default('') }),
-  messages: z.object({ channelId: text, text: z.string().trim().min(1).max(10000) }),
+  channels: z.object({
+    title: text,
+    projectId,
+    description: z.string().max(1000).default(''),
+    visibility: z.enum(['workspace', 'direct']).default('workspace'),
+    memberIds: z.array(z.string().max(100)).max(2).default([]),
+  }),
+  messages: z
+    .object({
+      channelId: text,
+      text: z.string().trim().max(10000).default(''),
+      attachments: z.array(z.string().max(100)).max(100).default([]),
+      callId: z.string().max(100).default(''),
+    })
+    .refine(
+      (v) => v.text.length || v.attachments.length || v.callId,
+      'Write a message or attach a file',
+    ),
   events: z
     .object({
       ...base,

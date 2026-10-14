@@ -1,10 +1,9 @@
+import { mediaPreferences, audioConstraints, videoConstraints, setSpeaker } from './MediaSettings';
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import {
-  Hash,
-  Plus,
-  Send,
   Video,
+  Plus,
   CalendarDays,
   Clock3,
   Mic,
@@ -17,208 +16,16 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import {
+  niceDate,
   api,
-  save,
   getCsrf,
   initials,
   isoToday,
-  niceDate,
   type State,
   type User,
   type Item,
 } from './api';
-import { Badge, Empty, FormModal, Modal } from './components';
-
-export function Chat({
-  state,
-  user,
-  users,
-  refresh,
-  notify,
-  projectOptions,
-}: {
-  state: State;
-  user: User;
-  users: User[];
-  refresh: () => Promise<void>;
-  notify: (t: string) => void;
-  projectOptions: { value: string; label: string }[];
-}) {
-  const [channel, setChannel] = useState(state.channels?.[0]?.id ?? ''),
-    [messages, setMessages] = useState<Item[]>(state.messages ?? []),
-    [text, setText] = useState(''),
-    [newChannel, setNewChannel] = useState(false),
-    [busy, setBusy] = useState(false),
-    [connected, setConnected] = useState(false);
-  const bottom = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    setMessages(state.messages ?? []);
-    if (!channel && state.channels?.[0]) setChannel(state.channels[0].id);
-  }, [state]);
-  useEffect(() => {
-    if (!channel) return;
-    const socket = io({ auth: { csrf: getCsrf() } });
-    socket.on('connect', () => {
-      setConnected(true);
-      socket.emit('channel:join', channel);
-      api('/entities/messages')
-        .then(setMessages)
-        .catch((e) => notify(e.message));
-    });
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('connect_error', () => setConnected(false));
-    socket.on('message', (message: Item) =>
-      setMessages((ms) => (ms.some((m) => m.id === message.id) ? ms : [...ms, message])),
-    );
-    return () => {
-      socket.disconnect();
-    };
-  }, [channel]);
-  useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [messages, channel]);
-  const current = state.channels?.find((c) => c.id === channel),
-    list = messages
-      .filter((m) => m.channelId === channel)
-      .sort((a, b) => a.created.localeCompare(b.created));
-  const send = async () => {
-    if (!text.trim() || !channel || busy) return;
-    setBusy(true);
-    try {
-      const message = await save('messages', { channelId: channel, text });
-      setMessages((ms) => (ms.some((m) => m.id === message.id) ? ms : [...ms, message]));
-      setText('');
-    } catch (e) {
-      notify((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="chat-layout">
-      <aside className="channels">
-        <div>
-          <strong>Channels</strong>
-          <button
-            className="icon-button"
-            aria-label="New channel"
-            onClick={() => setNewChannel(true)}
-          >
-            <Plus size={17} />
-          </button>
-        </div>
-        {state.channels?.map((c) => (
-          <button
-            className={channel === c.id ? 'active' : ''}
-            key={c.id}
-            onClick={() => setChannel(c.id)}
-          >
-            <Hash size={18} />
-            {c.title}
-          </button>
-        ))}
-        <footer>
-          <span className={`online-dot ${connected ? '' : 'offline'}`} />
-          {connected ? 'Connected' : 'Reconnecting…'}
-        </footer>
-      </aside>
-      <section className="conversation">
-        <header>
-          <Hash size={22} />
-          <div>
-            <h3>{current?.title ?? 'Your conversations'}</h3>
-            <p>{current?.description || 'A space to bring your ideas together.'}</p>
-          </div>
-          <div className="grow" />
-          <Users size={19} />
-        </header>
-        <div className="message-list">
-          {!list.length && (
-            <Empty
-              title={`This is the start of #${current?.title ?? 'your channel'}`}
-              description="Share an idea, ask a question, start something good."
-            />
-          )}
-          {list.map((m, i) => {
-            const author = users.find((u) => u.id === m.owner),
-              same = i > 0 && list[i - 1].owner === m.owner;
-            return (
-              <article
-                key={m.id}
-                className={`chat-message ${m.owner === user.id ? 'own' : ''} ${same ? 'continued' : ''}`}
-              >
-                <span className="avatar">{initials(author?.name ?? '?')}</span>
-                <div>
-                  <header>
-                    <strong>{author?.name ?? 'Team member'}</strong>
-                    <time>
-                      {new Date(m.created).toLocaleTimeString('en-GB', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </time>
-                  </header>
-                  <p>{m.text}</p>
-                </div>
-              </article>
-            );
-          })}
-          <div ref={bottom} />
-        </div>
-        <form
-          className="chat-composer"
-          onSubmit={(e) => {
-            e.preventDefault();
-            send();
-          }}
-        >
-          <textarea
-            aria-label="Channel message"
-            placeholder={`Message #${current?.title ?? 'channel'}…`}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-          />
-          <div>
-            <small>Enter to send · Shift + Enter for a new line</small>
-            <button className="button primary" disabled={busy || !text.trim() || !channel}>
-              <Send size={16} /> Send
-            </button>
-          </div>
-        </form>
-      </section>
-      {newChannel && (
-        <FormModal
-          title="Create a channel"
-          onClose={() => setNewChannel(false)}
-          fields={[
-            { key: 'title', label: 'Channel name', required: true },
-            { key: 'description', label: 'What is this channel for?', type: 'textarea' },
-            {
-              key: 'projectId',
-              label: 'Access',
-              type: 'select',
-              options: projectOptions.map((p) =>
-                p.value ? p : { value: '', label: 'Everyone in the workspace' },
-              ),
-            },
-          ]}
-          onSubmit={async (data) => {
-            const c = await save('channels', data);
-            await refresh();
-            setChannel(c.id);
-            notify('Channel created');
-          }}
-        />
-      )}
-    </div>
-  );
-}
+import { Badge, Empty, Modal } from './components';
 
 export function Meetings({
   state,
@@ -371,12 +178,26 @@ function VideoTile({
   stream,
   name,
   muted = false,
+  userId,
 }: {
   stream: MediaStream;
   name: string;
   muted?: boolean;
+  userId: string;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const [outputError, setOutputError] = useState('');
+  useEffect(() => {
+    const apply = () => {
+      if (ref.current && !muted)
+        setSpeaker(ref.current, mediaPreferences(userId).speaker).catch((e) =>
+          setOutputError(e.message),
+        );
+    };
+    apply();
+    window.addEventListener('reverse-media-change', apply);
+    return () => window.removeEventListener('reverse-media-change', apply);
+  }, [userId, muted]);
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
@@ -384,10 +205,11 @@ function VideoTile({
     <div className="video-tile">
       <video ref={ref} autoPlay playsInline muted={muted} />
       <span>{name}</span>
+      {outputError && <small>{outputError}</small>}
     </div>
   );
 }
-function MeetingRoom({
+export function MeetingRoom({
   meeting,
   user,
   onClose,
@@ -402,9 +224,11 @@ function MeetingRoom({
     [remotes, setRemotes] = useState<Record<string, { stream: MediaStream; name: string }>>({}),
     [error, setError] = useState(''),
     [mic, setMic] = useState(true),
-    [camera, setCamera] = useState(true),
+    [camera, setCamera] = useState(meeting.callMode !== 'audio'),
+    [starting, setStarting] = useState(false),
     [screen, setScreen] = useState<MediaStream | null>(null),
     [ready, setReady] = useState(false);
+  const mounted = useRef(true);
   const socket = useRef<Socket | null>(null),
     peers = useRef<Record<string, RTCPeerConnection>>({}),
     localRef = useRef<MediaStream | null>(null),
@@ -412,15 +236,25 @@ function MeetingRoom({
     candidates = useRef<Record<string, RTCIceCandidateInit[]>>({}),
     ice = useRef<RTCConfiguration>({ iceServers: [] });
   const cleanup = () => {
+    if (localRef.current && meeting.call && meeting.owner === user.id)
+      api('/chat/calls/' + meeting.id + '/end', 'POST').catch(() => {});
     socket.current?.emit('meeting:leave');
     socket.current?.disconnect();
     Object.values(peers.current).forEach((p) => p.close());
     peers.current = {};
     localRef.current?.getTracks().forEach((t) => t.stop());
     screenRef.current?.getTracks().forEach((t) => t.stop());
+    localRef.current = null;
+    screenRef.current = null;
   };
-  useEffect(() => () => cleanup(), []);
-  const makePeer = (id: string, name: string) => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      cleanup();
+    };
+  }, []);
+  const makePeer = (id: string, name: string, initiator = true) => {
     if (peers.current[id]) return peers.current[id];
     const pc = new RTCPeerConnection(ice.current);
     peers.current[id] = pc;
@@ -429,6 +263,8 @@ function MeetingRoom({
         t.kind === 'video' && screenRef.current ? screenRef.current.getVideoTracks()[0] : t;
       pc.addTrack(track, screenRef.current ?? localRef.current!);
     });
+    if (initiator && !localRef.current?.getVideoTracks().length)
+      pc.addTransceiver('video', { direction: 'sendrecv', streams: [localRef.current!] });
     pc.onicecandidate = (e) => {
       if (e.candidate)
         socket.current?.emit('meeting:signal', {
@@ -438,21 +274,33 @@ function MeetingRoom({
         });
     };
     pc.ontrack = (e) =>
-      setRemotes((r) => ({
-        ...r,
-        [id]: { stream: e.streams[0] ?? new MediaStream([e.track]), name },
-      }));
+      setRemotes((r) => {
+        const stream = r[id]?.stream || e.streams[0] || new MediaStream();
+        if (!stream.getTracks().includes(e.track)) stream.addTrack(e.track);
+        return { ...r, [id]: { stream, name } };
+      });
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed')
         setError('A peer connection failed. Check HTTPS and your TURN configuration.');
     };
     return pc;
   };
-  const start = async () => {
+  const start = async (withVideo = camera) => {
+    if (starting) return;
+    setStarting(true);
     setError('');
     try {
       ice.current = await api('/rtc-config');
-      const media = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      const prefs = mediaPreferences(user.id);
+      const media = await navigator.mediaDevices.getUserMedia({
+        audio: audioConstraints(prefs),
+        video: withVideo ? videoConstraints(prefs) : false,
+      });
+      if (!mounted.current) {
+        media.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      setCamera(withVideo);
       localRef.current = media;
       setLocal(media);
       const s = io({ auth: { csrf: getCsrf() } });
@@ -470,6 +318,9 @@ function MeetingRoom({
       });
       s.on('connect_error', () => setError('Unable to authenticate the meeting connection.'));
       s.on('meeting:error', setError);
+      s.on('call:ended', (call: Item) => {
+        if (call.id === meeting.id) onClose();
+      });
       s.on('meeting:peers', async (members: { id: string; name: string }[]) => {
         for (const member of members)
           try {
@@ -486,12 +337,14 @@ function MeetingRoom({
       });
       s.on('meeting:signal', async ({ from, signal, name }) => {
         try {
-          const pc = makePeer(from, name);
+          const pc = makePeer(from, name, false);
           if (signal.description) {
             await pc.setRemoteDescription(signal.description);
             for (const c of candidates.current[from] ?? []) await pc.addIceCandidate(c);
             candidates.current[from] = [];
             if (signal.description.type === 'offer') {
+              for (const transceiver of pc.getTransceivers())
+                if (transceiver.receiver.track.kind === 'video') transceiver.direction = 'sendrecv';
               await pc.setLocalDescription(await pc.createAnswer());
               s.emit('meeting:signal', {
                 to: from,
@@ -519,11 +372,13 @@ function MeetingRoom({
     } catch (e) {
       setError(`Could not start camera and microphone: ${(e as Error).message}`);
       cleanup();
+    } finally {
+      if (mounted.current) setStarting(false);
     }
   };
   const stopScreen = async () => {
     for (const pc of Object.values(peers.current)) {
-      const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+      const sender = pc.getTransceivers().find((t) => t.receiver.track.kind === 'video')?.sender;
       await sender?.replaceTrack(localRef.current?.getVideoTracks()[0] ?? null);
     }
     screenRef.current?.getTracks().forEach((t) => t.stop());
@@ -541,19 +396,24 @@ function MeetingRoom({
       setScreen(stream);
       for (const pc of Object.values(peers.current))
         await pc
-          .getSenders()
-          .find((s) => s.track?.kind === 'video')
-          ?.replaceTrack(stream.getVideoTracks()[0]);
+          .getTransceivers()
+          .find((t) => t.receiver.track.kind === 'video')
+          ?.sender?.replaceTrack(stream.getVideoTracks()[0]);
       stream.getVideoTracks()[0].onended = () => stopScreen();
     } catch (e) {
       notify((e as Error).message);
     }
   };
+  const leave = () => {
+    if (meeting.call && meeting.owner === user.id)
+      api('/chat/calls/' + meeting.id + '/end', 'POST').catch(() => {});
+    onClose();
+  };
   return (
     <Modal
       title={meeting.title}
       description="Your meeting space · audio, video & screen sharing"
-      onClose={onClose}
+      onClose={leave}
       wide
     >
       <div className="meeting-room">
@@ -562,17 +422,32 @@ function MeetingRoom({
           <div className="meeting-lobby">
             <Video size={44} />
             <h2>A good conversation starts here.</h2>
-            <p>Your browser will ask for camera and microphone permission.</p>
-            <button className="button primary" onClick={start}>
-              <Video size={16} /> Enter meeting
+            <p>
+              {camera
+                ? 'Your browser will ask for camera and microphone permission.'
+                : 'Audio call · your camera stays off until you enable it.'}{' '}
+              Preferred devices come from My account → Audio & video preferences.
+            </p>
+            <button className="button primary" disabled={starting} onClick={() => start()}>
+              <Video size={16} /> {starting ? 'Connecting…' : 'Enter meeting'}
             </button>
+            {camera && (
+              <button className="button" disabled={starting} onClick={() => start(false)}>
+                Join audio only
+              </button>
+            )}
           </div>
         ) : (
           <>
             <div className="video-grid">
-              <VideoTile stream={screen ?? local} name={user.name + ' (you)'} muted />
+              <VideoTile
+                stream={screen ?? local}
+                name={user.name + ' (you)'}
+                userId={user.id}
+                muted
+              />
               {Object.entries(remotes).map(([id, r]) => (
-                <VideoTile key={id} stream={r.stream} name={r.name} />
+                <VideoTile key={id} stream={r.stream} name={r.name} userId={user.id} />
               ))}
             </div>
             <div className="meeting-status">
@@ -595,9 +470,34 @@ function MeetingRoom({
               <button
                 aria-label={camera ? 'Turn camera off' : 'Turn camera on'}
                 className={`icon-button ${camera ? '' : 'off'}`}
-                onClick={() => {
-                  local.getVideoTracks().forEach((t) => (t.enabled = !camera));
-                  setCamera(!camera);
+                onClick={async () => {
+                  try {
+                    if (!localRef.current?.getVideoTracks().length) {
+                      const capture = await navigator.mediaDevices.getUserMedia({
+                        video: videoConstraints(mediaPreferences(user.id)),
+                        audio: false,
+                      });
+                      if (!mounted.current || !localRef.current) {
+                        capture.getTracks().forEach((t) => t.stop());
+                        return;
+                      }
+                      const track = capture.getVideoTracks()[0];
+                      localRef.current.addTrack(track);
+                      if (!screenRef.current)
+                        for (const pc of Object.values(peers.current))
+                          await pc
+                            .getTransceivers()
+                            .find((t) => t.receiver.track.kind === 'video')
+                            ?.sender.replaceTrack(track);
+                      setLocal(new MediaStream(localRef.current.getTracks()));
+                      setCamera(true);
+                    } else {
+                      localRef.current.getVideoTracks().forEach((t) => (t.enabled = !camera));
+                      setCamera(!camera);
+                    }
+                  } catch (e) {
+                    setError((e as Error).message);
+                  }
                 }}
               >
                 {camera ? <Camera /> : <CameraOff />}
@@ -609,7 +509,7 @@ function MeetingRoom({
                 <MonitorUp size={18} />
                 {screen ? 'Stop sharing' : 'Share screen'}
               </button>
-              <button className="button danger" onClick={onClose}>
+              <button className="button danger" onClick={leave}>
                 <PhoneOff size={18} /> Leave
               </button>
             </div>
@@ -617,5 +517,64 @@ function MeetingRoom({
         )}
       </div>
     </Modal>
+  );
+}
+
+export function CallNotifications({
+  user,
+  notify,
+}: {
+  user: User;
+  notify: (text: string) => void;
+}) {
+  const [invite, setInvite] = useState<Item | null>(null),
+    [meeting, setMeeting] = useState<Item | null>(null);
+  useEffect(() => {
+    const socket = io({ auth: { csrf: getCsrf() } });
+    socket.on('call:invite', (call: Item) => setInvite(call));
+    socket.on('call:ended', (call: Item) =>
+      setInvite((current) => (current?.id === call.id ? null : current)),
+    );
+    return () => {
+      socket.disconnect();
+    };
+  }, [user.id]);
+  useEffect(() => {
+    if (!invite) return;
+    const timer = setTimeout(() => setInvite(null), 45000);
+    return () => clearTimeout(timer);
+  }, [invite]);
+  return (
+    <>
+      {invite && !meeting && (
+        <aside className="incoming-call" role="dialog" aria-label="Incoming call">
+          <Video />
+          <div>
+            <strong>{invite.title}</strong>
+            <p>Incoming {invite.callMode} call</p>
+          </div>
+          <button
+            className="button primary"
+            onClick={() => {
+              setMeeting(invite);
+              setInvite(null);
+            }}
+          >
+            Accept call
+          </button>
+          <button className="button" onClick={() => setInvite(null)}>
+            Decline call
+          </button>
+        </aside>
+      )}
+      {meeting && (
+        <MeetingRoom
+          meeting={meeting}
+          user={user}
+          onClose={() => setMeeting(null)}
+          notify={notify}
+        />
+      )}
+    </>
   );
 }

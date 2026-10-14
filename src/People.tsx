@@ -30,6 +30,19 @@ export function People({
     { key: 'department', label: 'Department' },
     { key: 'jobTitle', label: 'Job title' },
     {
+      key: 'managerId',
+      label: 'Reports to',
+      type: 'select',
+      default: '',
+      options: [
+        { value: '', label: 'No assigned manager' },
+        ...users
+          .filter((u) => u.active && ['manager', 'admin'].includes(u.role) && u.id !== form?.id)
+          .map((u) => ({ value: u.id, label: u.name })),
+      ],
+      help: 'Reporting lines organize your team. Account roles still control approvals and project access.',
+    },
+    {
       key: 'role',
       label: 'Role',
       type: 'select',
@@ -56,7 +69,12 @@ export function People({
   ];
   const rows = users.filter(
     (u) =>
-      (filter === 'all' || (filter === 'active' ? !!u.active : !u.active)) &&
+      (filter === 'all' ||
+        (filter === 'team'
+          ? u.managerId === user.id
+          : filter === 'active'
+            ? !!u.active
+            : !u.active)) &&
       `${u.name} ${u.email} ${u.department} ${u.jobTitle}`
         .toLowerCase()
         .includes(query.toLowerCase()),
@@ -103,6 +121,7 @@ export function People({
           onChange={(e) => setFilter(e.target.value)}
         >
           <option value="all">All accounts</option>
+          <option value="team">My direct reports</option>
           <option value="active">Active</option>
           <option value="disabled">Disabled</option>
         </select>
@@ -113,6 +132,7 @@ export function People({
             <tr>
               <th>Person</th>
               <th>Role & department</th>
+              <th>Reports to</th>
               <th>Work calendar</th>
               <th>Projects</th>
               <th>Status</th>
@@ -137,6 +157,10 @@ export function People({
                     {u.department || '—'}
                     {u.jobTitle ? ` · ${u.jobTitle}` : ''}
                   </small>
+                </td>
+                <td>
+                  {users.find((p) => p.id === u.managerId)?.name || 'Unassigned'}
+                  <small>{users.filter((p) => p.managerId === u.id).length} direct reports</small>
                 </td>
                 <td>{u.calendarId || org.calendarId || 'default'}</td>
                 <td>
