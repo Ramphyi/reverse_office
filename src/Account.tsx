@@ -1,3 +1,4 @@
+import { MediaSettings } from './MediaSettings';
 import { useState } from 'react';
 import { KeyRound, ShieldCheck, UserRound } from 'lucide-react';
 import { api, setCsrf, type User, type Item } from './api';
@@ -156,6 +157,7 @@ export function Account({
           </button>
         </form>
       </div>
+      {!user.mustChangePassword && <MediaSettings userId={user.id} />}
       <button
         className="button secondary"
         onClick={async () => {

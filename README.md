@@ -139,3 +139,5 @@ Choose the provider and model in **Administration → AI settings** (company) or
 local OpenAI-compatible models, with model listing and connection tests. Studio uses
 an optional paired host gateway for OpenAI: `npm run studio:ai`. No new npm dependencies
 or model runtimes are bundled. See [setup and key storage](docs/ASSISTANT.md#choose-a-provider-and-model-in-settings).
+
+Reporting lines, private rich chat, file/folder attachments, audio/video calls and preferred devices: [setup and behavior](docs/COLLABORATION.md).

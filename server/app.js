@@ -1,3 +1,4 @@
+import { installChat } from './chat.js';
 import { createAISettings, installAISettings } from './ai-settings.js';
 import express from 'express';
 import { installAssistant } from './assistant.js';
@@ -40,6 +41,7 @@ const publicUser = (u) => ({
   department: u.department || '',
   jobTitle: u.job_title || '',
   calendarId: u.calendar_id || '',
+  managerId: u.manager_id || '',
 });
 const cookie = (req) =>
   Object.fromEntries((req.headers.cookie ?? '').split(';').map((v) => v.trim().split('=')));
@@ -49,6 +51,8 @@ export function createApp({
   test = false,
   officeOptions,
 } = {}) {
+  const sessionCookie = process.env.SESSION_COOKIE || 'ro_session';
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(sessionCookie)) throw Error('Invalid session cookie name');
   const app = express(),
     store = openStore(dataDir),
     uploadDir = path.resolve(dataDir, 'files');
@@ -70,6 +74,7 @@ export function createApp({
           scriptSrc: ["'self'", ...(editorOrigin ? [editorOrigin] : [])],
           styleSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", 'data:', 'blob:'],
+          mediaSrc: ["'self'", 'blob:'],
           connectSrc: ["'self'", 'ws:', 'wss:'],
           frameSrc: ["'self'", 'blob:', ...(editorOrigin ? [editorOrigin] : [])],
           objectSrc: ["'none'"],
@@ -97,10 +102,12 @@ export function createApp({
     storage: multer.memoryStorage(),
     limits: { fileSize: 25 * 1024 * 1024, files: 1 },
   });
-  app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+  app.get('/api/health', (req, res) =>
+    res.json({ status: 'ok', preview: process.env.PREVIEW_MODE === 'true' }),
+  );
   app.get('/api/setup', (req, res) => res.json({ required: store.users().length === 0 }));
   function session(req) {
-    const token = cookie(req).ro_session;
+    const token = cookie(req)[sessionCookie];
     if (!token) return null;
     return store.db
       .prepare(
@@ -115,7 +122,7 @@ export function createApp({
     store.db
       .prepare('INSERT INTO sessions VALUES (?,?,?,?)')
       .run(digest(token), user.id, csrf, Date.now() + 8 * 3600000);
-    res.cookie('ro_session', token, {
+    res.cookie(sessionCookie, token, {
       httpOnly: true,
       sameSite: 'strict',
       secure: process.env.COOKIE_SECURE === 'true',
@@ -175,8 +182,8 @@ export function createApp({
   });
   app.get('/api/me', (req, res) => res.json({ user: publicUser(req.user), csrf: req.user.csrf }));
   app.post('/api/logout', (req, res) => {
-    store.db.prepare('DELETE FROM sessions WHERE token=?').run(digest(cookie(req).ro_session));
-    res.clearCookie('ro_session', { path: '/' });
+    store.db.prepare('DELETE FROM sessions WHERE token=?').run(digest(cookie(req)[sessionCookie]));
+    res.clearCookie(sessionCookie, { path: '/' });
     res.json({ ok: true });
   });
   app.post('/api/password', loginLimit, (req, res) => {
@@ -210,6 +217,14 @@ export function createApp({
     if (kind === 'projects') return hasProject(user, item.id);
     if (kind === 'messages')
       return readable(user, 'channels', store.get('channels', item.channelId));
+    if (kind === 'channels' && item.visibility === 'direct')
+      return item.memberIds?.includes(user.id);
+    if (
+      kind === 'events' &&
+      item.call &&
+      !readable(user, 'channels', store.get('channels', item.channelId))
+    )
+      return false;
     if (kind === 'channels' || kind === 'pages')
       return !item.projectId || hasProject(user, item.projectId);
     if (kind === 'events')
@@ -222,6 +237,9 @@ export function createApp({
   }
   function writable(user, kind, item) {
     if (!readable(user, kind, item)) return false;
+    if ((kind === 'events' && item.call) || (kind === 'channels' && item.visibility === 'direct'))
+      return false;
+    if (kind === 'messages') return item.owner === user.id;
     if (['projects', 'calendars', 'entitlements'].includes(kind)) return manager(user);
     if (['messages', 'mail', 'pages', 'channels'].includes(kind))
       return item.owner === user.id || manager(user);
@@ -249,6 +267,9 @@ export function createApp({
       fail(403, 'You do not have access to this project');
   }
   function validateRefs(kind, data, user, old) {
+    if (kind === 'channels' && (data.visibility === 'direct' || old?.visibility === 'direct'))
+      fail(400, 'Use private conversation creation');
+    if (kind === 'messages') chat.validateMessage(data, user, old);
     ensureProject(user, data);
     if (['projects', 'calendars', 'entitlements'].includes(kind) && !manager(user))
       fail(403, 'Manager access required');
@@ -370,21 +391,41 @@ export function createApp({
       fail(413, 'Document is too large');
   }
   workforce.install(app, { validateRefs, credentialLimit: loginLimit });
+  const chat = installChat(app, { store, readable, session, uploadDir, fail });
   app.get('/api/users', (req, res) =>
     res.json(
-      store
-        .users()
-        .map((u) =>
-          manager(req.user)
-            ? u
-            : { id: u.id, name: u.name, email: u.email, role: u.role, active: u.active },
-        ),
+      store.users().map((u) =>
+        manager(req.user)
+          ? u
+          : {
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              role: u.role,
+              active: u.active,
+              managerId: u.managerId,
+            },
+      ),
     ),
   );
+  function validateManager(managerId, personId) {
+    if (!managerId) return;
+    const people = store.users(),
+      boss = people.find((u) => u.id === managerId);
+    if (!boss?.active || !manager(boss)) fail(400, 'Choose an active manager or administrator');
+    const seen = new Set(personId ? [personId] : []);
+    let cursor = boss;
+    while (cursor) {
+      if (seen.has(cursor.id)) fail(400, 'Reporting lines cannot contain a cycle');
+      seen.add(cursor.id);
+      cursor = people.find((u) => u.id === cursor.managerId);
+    }
+  }
   app.post('/api/users', (req, res) => {
     if (req.user.role !== 'admin') fail(403, 'Administrator access required');
     const data = account
       .extend({
+        managerId: z.string().max(100).default(''),
         department: z.string().trim().max(100).default(''),
         jobTitle: z.string().trim().max(100).default(''),
         calendarId: z.string().max(100).optional(),
@@ -394,6 +435,7 @@ export function createApp({
         allowanceYear: z.number().int().min(2000).max(2200).optional(),
       })
       .parse(req.body);
+    validateManager(data.managerId);
     if (data.projectIds.some((id) => !store.get('projects', id))) fail(400, 'Unknown project');
     if (data.calendarId && !store.all('calendars').some((c) => c.calendarId === data.calendarId))
       fail(400, 'Unknown calendar');
@@ -403,13 +445,14 @@ export function createApp({
       const u = store.addUser(data);
       store.db
         .prepare(
-          'UPDATE users SET department=?,job_title=?,calendar_id=?,must_change_password=? WHERE id=?',
+          'UPDATE users SET department=?,job_title=?,calendar_id=?,must_change_password=?,manager_id=? WHERE id=?',
         )
         .run(
           data.department,
           data.jobTitle,
           data.calendarId || '',
           data.mustChangePassword ? 1 : 0,
+          data.managerId,
           u.id,
         );
       for (const id of data.projectIds) {
@@ -435,7 +478,7 @@ export function createApp({
           },
           req.user.id,
         );
-      store.audit(req.user.id, 'account.create', u.id, { role: u.role });
+      store.audit(req.user.id, 'account.create', u.id, { role: u.role, managerId: data.managerId });
       return store.users().find((v) => v.id === u.id);
     });
     res.status(201).json(user);
@@ -447,6 +490,7 @@ export function createApp({
           active: z.boolean(),
           role: z.enum(['admin', 'manager', 'member']),
           name: z.string().trim().min(2).max(100).optional(),
+          managerId: z.string().max(100).optional(),
           department: z.string().trim().max(100).optional(),
           jobTitle: z.string().trim().max(100).optional(),
           calendarId: z.string().max(100).optional(),
@@ -455,6 +499,12 @@ export function createApp({
         .parse(req.body),
       target = store.users().find((u) => u.id === req.params.id);
     if (!target) fail(404, 'Account not found');
+    validateManager(data.managerId ?? target.managerId, target.id);
+    if (
+      (!data.active || data.role === 'member') &&
+      store.users().some((u) => u.managerId === target.id)
+    )
+      fail(409, 'Reassign this person’s reports before disabling or removing their manager role');
     if (target.id === req.user.id && (!data.active || data.role !== 'admin'))
       fail(400, 'You cannot remove your own administrator access');
     if (data.projectIds?.some((id) => !store.get('projects', id))) fail(400, 'Unknown project');
@@ -462,12 +512,15 @@ export function createApp({
       fail(400, 'Unknown calendar');
     store.transaction(() => {
       store.db
-        .prepare('UPDATE users SET name=?,department=?,job_title=?,calendar_id=? WHERE id=?')
+        .prepare(
+          'UPDATE users SET name=?,department=?,job_title=?,calendar_id=?,manager_id=? WHERE id=?',
+        )
         .run(
           data.name ?? target.name,
           data.department ?? target.department,
           data.jobTitle ?? target.jobTitle,
           data.calendarId ?? target.calendarId,
+          data.managerId ?? target.managerId,
           target.id,
         );
       if (data.projectIds)
@@ -514,7 +567,11 @@ export function createApp({
     if (!schemas[kind] || kind === 'mail') fail(400, 'Unsupported collection');
     const data = schemas[kind].parse(req.body);
     validateRefs(kind, data, req.user);
-    const entity = store.put(kind, data, req.user.id);
+    const entity = store.transaction(() => {
+      const value = store.put(kind, data, req.user.id);
+      if (kind === 'messages') chat.claimAttachments(value);
+      return value;
+    });
     res.status(201).json(entity);
     if (kind === 'messages')
       for (const socket of app.locals.io?.sockets.sockets.values() ?? []) {
@@ -544,7 +601,12 @@ export function createApp({
       );
     const data = schemas[kind].parse(req.body);
     validateRefs(kind, data, req.user, old);
-    res.json(store.put(kind, data, req.user.id, id, req.body.version));
+    const updated = store.transaction(() => {
+      const value = store.put(kind, data, req.user.id, id, req.body.version);
+      if (kind === 'messages') chat.claimAttachments(value);
+      return value;
+    });
+    res.json(updated);
   });
   app.delete('/api/entities/:kind/:id', (req, res) => {
     const { kind, id } = req.params;

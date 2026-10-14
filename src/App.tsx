@@ -77,7 +77,8 @@ import { TemplateGallery } from './TemplateGallery';
 import { ThemePicker, useTheme } from './Theme';
 import { Assistant } from './Assistant';
 import { WorkspaceSidebar } from './WorkspaceSidebar';
-import { Chat, Meetings } from './Collaboration';
+import { Meetings, CallNotifications } from './Collaboration';
+import { Chat } from './Chat';
 import { Admin, TimeOff, Reports, Timesheets } from './Operations';
 
 type ModalConfig = {
@@ -146,6 +147,12 @@ const subtitles: Record<string, string> = {
   chat: 'Good things happen when we connect.',
 };
 export default function App() {
+  const [previewMode, setPreviewMode] = useState(false);
+  useEffect(() => {
+    api('/health')
+      .then((value) => setPreviewMode(!!value.preview))
+      .catch(() => {});
+  }, []);
   const { theme, choice, setChoice } = useTheme();
   const [templateKind, setTemplateKind] = useState<string | null>(null);
   const [pdfEditing, setPdfEditing] = useState<Item | null>(null);
@@ -1200,7 +1207,10 @@ export default function App() {
         )}
         <footer className="app-footer">
           <span>
-            <span className="online-dot" /> Your workspace. Your infrastructure.
+            <span className="online-dot" />{' '}
+            {previewMode
+              ? 'Development preview · isolated data copy · port 3003'
+              : 'Your workspace. Your infrastructure.'}
           </span>
           <span>
             Reverse Office <span className="footer-dot">·</span> Made for better work
@@ -1217,6 +1227,7 @@ export default function App() {
           <Sparkles size={22} />
           <span>Ask AI</span>
         </button>
+        <CallNotifications user={user} notify={notify} />
         <Assistant
           key={user.id}
           open={ai}

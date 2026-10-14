@@ -42,7 +42,11 @@ io.on('connection', (socket) => {
   });
   const canJoin = (room) => {
     const event = store.get('events', room);
-    return event && readable(socket.data.user, 'events', event);
+    return (
+      event &&
+      (!event.call || (!event.endedAt && Date.parse(event.end) > Date.now())) &&
+      readable(socket.data.user, 'events', event)
+    );
   };
   socket.on('channel:join', (id) => {
     if (readable(socket.data.user, 'channels', store.get('channels', id)))
@@ -50,7 +54,11 @@ io.on('connection', (socket) => {
   });
   socket.on('meeting:join', (id) => {
     if (typeof id !== 'string' || !canJoin(id)) return;
-    for (const room of socket.rooms) if (room.startsWith('meeting:')) socket.leave(room);
+    for (const room of socket.rooms)
+      if (room.startsWith('meeting:')) {
+        socket.to(room).emit('meeting:left', socket.id);
+        socket.leave(room);
+      }
     const room = `meeting:${id}`,
       members = [...(io.sockets.adapter.rooms.get(room) ?? [])].map((sid) => ({
         id: sid,
@@ -64,13 +72,19 @@ io.on('connection', (socket) => {
     socket.emit('meeting:peers', members);
     socket.to(room).emit('meeting:joined', { id: socket.id, name: socket.data.user.name });
   });
-  socket.on('meeting:signal', ({ to, room, signal }) => {
+  socket.on('meeting:signal', (payload) => {
+    if (!payload || typeof payload !== 'object') return;
+    const { to, room, signal } = payload;
+    if (typeof to !== 'string' || typeof room !== 'string' || !signal || typeof signal !== 'object')
+      return;
     const target = io.sockets.sockets.get(to);
+    const targetUser = target && session(target.request);
     if (
       !canJoin(room) ||
       !socket.rooms.has(`meeting:${room}`) ||
       !target?.rooms.has(`meeting:${room}`) ||
-      !readable(target.data.user, 'events', store.get('events', room))
+      !targetUser ||
+      !readable(targetUser, 'events', store.get('events', room))
     )
       return;
     target.emit('meeting:signal', { from: socket.id, room, signal, name: socket.data.user.name });

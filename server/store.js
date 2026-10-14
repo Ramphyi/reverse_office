@@ -31,6 +31,7 @@ export function openStore(dir) {
   for (const [name, definition] of Object.entries({
     must_change_password: 'INTEGER NOT NULL DEFAULT 0',
     department: "TEXT NOT NULL DEFAULT ''",
+    manager_id: "TEXT NOT NULL DEFAULT ''",
     job_title: "TEXT NOT NULL DEFAULT ''",
     calendar_id: "TEXT NOT NULL DEFAULT ''",
   }))
@@ -109,7 +110,7 @@ export function openStore(dir) {
   const users = () =>
     db
       .prepare(
-        'SELECT id,name,email,role,active,created,must_change_password AS mustChangePassword,department,job_title AS jobTitle,calendar_id AS calendarId FROM users ORDER BY name',
+        'SELECT id,name,email,role,active,created,must_change_password AS mustChangePassword,department,job_title AS jobTitle,calendar_id AS calendarId,manager_id AS managerId FROM users ORDER BY name',
       )
       .all();
   function addUser({ name, email, password, role = 'member' }) {

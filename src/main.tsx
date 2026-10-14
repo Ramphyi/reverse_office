@@ -12,3 +12,4 @@ createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 );
 import './workspace-controls.css';
+import './chat.css';
