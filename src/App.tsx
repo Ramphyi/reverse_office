@@ -1,4 +1,5 @@
 import { PdfWorkspace } from './PdfWorkspace';
+import { ProductGuide } from './ProductGuide';
 import { Appearance, AppWindows, AttendanceInbox, OrganisationGraph } from './WorkspaceExperience';
 import { TeamSpace } from './TeamSpace';
 import { CompatibleDocument } from './CompatibleDocument';
@@ -130,6 +131,7 @@ const sections = [
       ['reports', 'Reports', Activity],
       ['admin', 'Administration', ShieldCheck],
       ['account', 'My account', Users],
+      ['guide', 'Guide', BookOpen],
     ],
   },
 ];
@@ -151,6 +153,7 @@ const subtitles: Record<string, string> = {
   mail: 'Keep the conversation moving.',
   calendar: 'Make time for what matters.',
   chat: 'Good things happen when we connect.',
+  guide: 'Learn your workspace, one useful step at a time.',
 };
 export default function App() {
   const [sharing, setSharing] = useState<Item | null>(null),
@@ -1176,6 +1179,15 @@ export default function App() {
                     notify={notify}
                   />
                 )}
+                {page === 'guide' && (
+                  <ProductGuide
+                    key={user.id}
+                    userId={user.id}
+                    role={user.role}
+                    spv={!!integrations.spv}
+                    onNavigate={(app) => (app === 'nova' ? setAi(true) : navigate(app))}
+                  />
+                )}
                 {page === 'reports' && <Reports state={state} notify={notify} />}
                 {page === 'account' && (
                   <Account user={user} onChanged={accountChanged} onLogout={() => setAuth(null)} />
@@ -1450,6 +1462,10 @@ function Login({ setup, onLogin }: { setup: boolean; onLogin: (a: any) => void }
             <ShieldCheck size={17} />
             <span>Hosted by you. Built around your privacy.</span>
           </div>
+          <nav className="login-project-links" aria-label="Learn about Reverse Office">
+            <a href="/welcome">About the project</a>
+            <a href="/guide">Explore the guide</a>
+          </nav>
         </div>
       </div>
     </div>
@@ -1563,6 +1579,14 @@ function Dashboard({
         </div>
         <span className="hero-caption">A WORKSPACE THAT WORKS WITH YOU.</span>
       </section>
+      <button className="guide-dashboard-link" onClick={() => navigate('guide')}>
+        <BookOpen size={22} />
+        <span>
+          <strong>Your workspace, explained.</strong>
+          <small>Explore every app, follow practical steps and keep your own progress.</small>
+        </span>
+        <ArrowUpRight size={18} />
+      </button>
       <section className="quick-apps">
         {[
           { kind: 'doc', label: 'Writer', description: 'Give ideas a voice', Icon: FileText },

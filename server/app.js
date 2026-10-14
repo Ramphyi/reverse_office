@@ -117,7 +117,7 @@ export function createApp({
   app.get('/api/health', (req, res) =>
     res.json({
       status: 'ok',
-      build: '2026.10.14-workspace-2',
+      build: '2026.10.14-guide-1',
       preview: process.env.PREVIEW_MODE === 'true',
     }),
   );

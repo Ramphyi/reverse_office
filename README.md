@@ -1,5 +1,13 @@
 # Reverse Office
 
+## Project page and practical guide
+
+Open `/welcome` for the public project introduction or `/guide` for the Romanian/English tutorial. In the local company preview these are **http://localhost:3003/welcome** and **http://localhost:3003/guide**. The existing `/` workspace and login flow remain available.
+
+The guide covers **19 chapters / 59 steps** across setup, editors, files, projects, chat, mail, time, people, administration and Nova, with the Romania/SPV extension explicitly marked as separate. Search, category filters, chapter links and manual checklists help you follow along. Progress is local to the browser and separated by account; checking a step does not perform an application action. Inside the workspace, use **Guide** in the sidebar or the Overview shortcut, then **Try it in the app** to open the real module. Public pages do not query company APIs or show company data. Light/dark themes, reduced-motion support and mobile layouts are included.
+
+The public app overview describes implemented capabilities and their configuration boundaries; it does not claim full Microsoft/Adobe parity or resolve the distribution license blockers below.
+
 ## Working independent editors
 
 **Reverse Studio is available as a separate original-MIT artifact:** `docker compose -p reverse-studio -f compose.studio.yaml up -d --build`, then open **http://localhost:3002**. It provides usable Writer, Sheets and Slides editors, Office exports, local saves and dark mode. Its final `scratch` image contains only original code and browser assets. No login is needed; standalone documents stay in that browser. See [features, limits and deployment](docs/STUDIO.md).

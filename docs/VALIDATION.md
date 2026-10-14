@@ -1,5 +1,13 @@
 # Executed validation
 
+## Public project page and bilingual guide — 2026-10-14
+
+Main passes the production build, **83/83 backend tests and 11/11 browser scenarios**. The new public-page test verifies Romanian/English switching, chapter deep links, search and empty results, manual progress persistence/reset, mobile width and dark contrast. It also asserts that visiting `/welcome` and `/guide` performs no company API requests. Desktop/light and mobile/dark screenshots were inspected.
+
+The authenticated guide test opens actual Writer and Nova controls, retains tutorial notes across reload, separates public notes from account notes and separates notes between two accounts in the same browser. A member receives no administrator-module launch button. Existing workspace workflows continue to pass. The app bundle is lazy-loaded so the public presentation does not load the company editor bundle.
+
+These changes add original source and no dependencies. They do not rebuild the standalone Studio artifact, enable external services, publish an internet site or remove the full-company license release block. The public routes are served by the existing company development preview; `/` retains its existing login/workspace behavior.
+
 ## Independent workspace experience — 2026-10-14
 
 Main passes the production TypeScript/Vite build, **83/83 backend tests**, **9/9 company browser scenarios** and **12/12 original Studio browser scenarios**. The Studio scenarios also pass against the rebuilt `scratch` Docker artifact on port 3002. Its source allowlist audit reports 11 original MIT components and zero issues; the full company image remains blocked and was not rebuilt.

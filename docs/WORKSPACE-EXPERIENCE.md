@@ -4,7 +4,9 @@ This release extends the company development preview with original MIT source. I
 
 ## Opening the current app
 
-The isolated local company preview is `http://localhost:3003/?v=2026.10.14-workspace-2`. It uses `data/company-preview`, existing accounts and its own `ro_preview` cookie. This is separate from the earlier container on port 3001 and browser-local Studio on port 3002. Switching between `localhost` and `127.0.0.1` changes the cookie host; use one consistently.
+The public project introduction is at `/welcome`; the Romanian/English tutorial is at `/guide`. The authenticated workspace also has a **Guide** sidebar entry with module launch buttons. The guide's 19 chapters and 59 manually checked steps explain actual workflows and limitations, including the separate SPV extension. Tutorial notes are stored per browser/account and never modify company records.
+
+The isolated local company preview is `http://localhost:3003/?v=2026.10.14-guide-1`. It uses `data/company-preview`, existing accounts and its own `ro_preview` cookie. This is separate from the earlier container on port 3001 and browser-local Studio on port 3002. Switching between `localhost` and `127.0.0.1` changes the cookie host; use one consistently.
 
 Sign in with **Keep me signed in for 30 days on this device** checked. Previously issued eight-hour sessions are not silently extended; sign in once to obtain the new persistent session. Unchecked logins remain eight hours. Logout, administrator reset/disable and password rotation revoke sessions as before. Browser cookie deletion/private browsing still removes login state. Secure cookies require HTTPS and `COOKIE_SECURE=true` in production. A password change creates a fresh ordinary eight-hour session; log in again with Remember enabled for a new thirty-day session.
 
