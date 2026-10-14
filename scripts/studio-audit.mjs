@@ -4,11 +4,33 @@ import { readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { LOCAL_PROVIDERS } from '../public/studio/agent.js';
 const root = fileURLToPath(new URL('../', import.meta.url));
-const assets = ['LICENSE', 'app.js', 'core.js', 'formats.js', 'index.html', 'styles.css'];
+const assets = [
+  'LICENSE',
+  'agent.js',
+  'app.js',
+  'assistant.js',
+  'core.js',
+  'floating.js',
+  'formats.js',
+  'index.html',
+  'search.js',
+  'styles.css',
+];
 const directory = path.join(root, 'public', 'studio');
 const actual = readdirSync(directory).sort();
 const issues = [];
+if (
+  JSON.stringify(LOCAL_PROVIDERS) !==
+  JSON.stringify([
+    'http://localhost:11434/v1',
+    'http://127.0.0.1:11434/v1',
+    'http://localhost:1234/v1',
+    'http://127.0.0.1:1234/v1',
+  ])
+)
+  issues.push('Model origin allowlist requires review.');
 if (JSON.stringify(actual) !== JSON.stringify(assets))
   issues.push('Unreviewed asset files in public/studio.');
 const components = [];
@@ -18,12 +40,30 @@ for (const name of assets) {
   if (name !== 'LICENSE' && !source.slice(0, 250).includes('SPDX-License-Identifier: MIT'))
     issues.push(name + ': original-source license marker missing.');
   if (name.endsWith('.js')) {
+    if (
+      name === 'agent.js' &&
+      ((source.match(/\bfetch\s*\(/g) || []).length !== 1 ||
+        /\bnew\s+(WebSocket|XMLHttpRequest|EventSource|Worker)\s*\(/.test(source))
+    )
+      issues.push('Agent network surface differs from the reviewed single loopback fetch.');
     for (const match of source.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g))
-      if (!['./core.js', './formats.js'].includes(match[1]))
+      if (
+        ![
+          './core.js',
+          './formats.js',
+          './assistant.js',
+          './agent.js',
+          './floating.js',
+          './search.js',
+        ].includes(match[1])
+      )
         issues.push(name + ': external import ' + match[1]);
     if (/\bimport\s*\(|\brequire\s*\(|\beval\s*\(|\bnew\s+Function\s*\(/.test(source))
       issues.push(name + ': runtime code loading requires review.');
-    if (/\bfetch\s*\(|\bnew\s+(WebSocket|XMLHttpRequest|EventSource|Worker)\s*\(/.test(source))
+    if (
+      name !== 'agent.js' &&
+      /\bfetch\s*\(|\bnew\s+(WebSocket|XMLHttpRequest|EventSource|Worker)\s*\(/.test(source)
+    )
       issues.push(name + ': network or worker runtime requires review.');
   }
   components.push({

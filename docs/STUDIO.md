@@ -33,11 +33,15 @@ Limits: 20 worksheets, 1,000 rows and 100 columns per worksheet; 100 slides; 20 
 - Studio JSON is the lossless format for this editor's supported model. Office formats are interoperability exports, not a promise of a feature-for-feature round trip. Cross-application rendering has not been exhaustively verified.
 - Sorting refuses formulas and merged ranges instead of silently damaging them. Merging asks before discarding non-anchor values. Renaming sheets updates supported formula references.
 - Print/PDF uses the browser's print dialog. Page orientation in Writer controls the canvas and DOCX export; choose the matching print orientation in the browser dialog.
-- The standalone release does **not** include certificate signing, mail, Teams-style conferencing, AI inference, organisation accounts, timesheets, company audit logs or SPV. Those company modules exist in the separate application; their all-components license migration remains unfinished. No fake local login or mock AI service is presented as an implementation of them.
+- The standalone release does **not** include certificate signing, mail, Teams-style conferencing, bundled AI inference, organisation accounts, timesheets, company audit logs or SPV. Those company modules exist in the separate application; their all-components license migration remains unfinished. No fake local login or mock AI service is presented as an implementation of them.
+
+## Assistant
+
+Ask AI opens a movable, resizable window with local document/cell search, image attachments and optional generative agents through a separately operated local model. See [assistant configuration and limits](ASSISTANT.md). The container includes the original client/tool code, not a model or inference runtime.
 
 ## Exact distributed contents and deployment
 
-`Dockerfile.studio` uses a pinned GCC image only to compile. The final stage is `scratch` and contains three files: `/studio`, `/manifest.json`, `/LICENSE`. The executable embeds the six allowed browser assets and a health response. It is original freestanding Linux **x86-64** code, statically linked with `-nostdlib`, with no libc, libgcc, startup runtime, interpreter, shell, OS packages or dynamic loader. Build checks reject undefined symbols, interpreter and shared-library dependencies. GCC and Python are not copied into the final image.
+`Dockerfile.studio` uses a pinned GCC image only to compile. The final stage is `scratch` and contains three files: `/studio`, `/manifest.json`, `/LICENSE`. The executable embeds the ten allowed browser assets and a health response. It is original freestanding Linux **x86-64** code, statically linked with `-nostdlib`, with no libc, libgcc, startup runtime, interpreter, shell, OS packages or dynamic loader. Build checks reject undefined symbols, interpreter and shared-library dependencies. GCC and Python are not copied into the final image.
 
 The existing host kernel, Docker/Kubernetes, and the user's browser are prerequisites, not software distributed inside this artifact. This distinction does not approve distributing their installers or images as MIT-only. Do not distribute the build stage as the Studio product. Any future package, copied code, font, certificate bundle or runtime must be audited before inclusion.
 

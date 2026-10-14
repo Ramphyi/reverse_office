@@ -20,6 +20,22 @@ Scope: the owner's original `public/studio`, `studio-server`, and company `Studi
 
 ## Validation and remaining limits
 
+The floating-assistant extension adds one reviewed network call site in original
+`agent.js`. It accepts only four literal loopback model origins (ports 11434 and
+1234), also enforced by the static server's CSP. No credentials, redirect following,
+remote scripts or provider SDKs are allowed. Model access is user-configured and
+requests occur only on Send. Responses are limited to 2 MB; model/tool counts,
+delegation depth and request time are bounded. Tool arguments cannot select a URL
+or execute code. Browser tools can read only the provided document snapshot.
+Generated text uses textContent. Local image conversion strips metadata and limits
+dimensions and payload size. The separately operated model service is outside the
+distributed artifact and must configure its own CORS and retention policy.
+
+The company gateway separately tests auth/CSRF, private-document refusal, current
+account activity, tool schemas, real delegate calls against protocol fixtures and
+current/legacy OpenCode deny-all session boundaries. The server audits tool outcomes
+without prompt or image bodies. No live third-party AI credentials were used in tests.
+
 The standalone browser suite exercises persisted rich-text editing, table insertion, merges, relative fills, charts, native Office packages, embedded images, printing content, compressed import, original retention, rectangular clipboard, dark mode, and stale-tab conflicts. XLSX output is parsed with ExcelJS independently from the original serializer. The container checks verify exact source/served hashes, CSP, HEAD behavior, method/path rejection, concurrent requests and oversized header handling.
 
 This is a developer review, not independent penetration testing or an assurance of zero defects. The freestanding server is an immutable local asset host, not a new secure account/TLS/API platform. The company stack still carries the previous license blockers. Imported Office fidelity, accessibility, spreadsheet semantics and large-document performance need broader testing before enterprise rollout. Existing team accounts and stored native files are preserved.

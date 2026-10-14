@@ -196,3 +196,50 @@ test('two users receive live messages and establish a WebRTC meeting', async ({ 
     await member.close();
   }
 });
+import { test as uiTest, expect as uiExpect } from '@playwright/test';
+uiTest(
+  'personal navigation and floating assistant work with persistent geometry and cell search',
+  async ({ page }) => {
+    await page.request.post('/api/login', {
+      data: { email: 'alex@example.test', password: 'Browser-test-password-42!' },
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Customize navigation' }).click();
+    const editor = page.getByRole('dialog', { name: 'Customize navigation' });
+    await editor.getByLabel('Mail', { exact: true }).uncheck();
+    await page.getByRole('button', { name: 'Close navigation settings' }).click();
+    await uiExpect(
+      page
+        .getByRole('navigation', { name: 'Workspace navigation' })
+        .getByRole('button', { name: 'Mail', exact: true }),
+    ).toHaveCount(0);
+    await page.getByRole('button', { name: 'Collapse navigation' }).click();
+    await page.reload();
+    await uiExpect(page.getByRole('button', { name: 'Expand navigation' })).toBeVisible();
+    await page.getByRole('button', { name: 'Expand navigation' }).click();
+    await page.getByRole('button', { name: 'Customize navigation' }).click();
+    await editor.getByRole('button', { name: 'Restore default navigation' }).click();
+    await page.getByRole('button', { name: 'Close navigation settings' }).click();
+    await page.getByRole('button', { name: 'Open floating assistant' }).click();
+    const panel = page.getByRole('complementary', { name: 'AI assistant' });
+    await page.getByLabel('AI agent').selectOption('sheets');
+    await page.getByLabel('Message to assistant').fill('find Discovery');
+    await page.getByRole('button', { name: 'Send to assistant' }).click();
+    await uiExpect(panel).toContainText('Sheet1!A2');
+    await uiExpect(panel).toContainText('workspace_search');
+    const before = await panel.boundingBox();
+    await page.getByLabel('Move assistant. Use arrow keys; Home resets position.').focus();
+    await page.keyboard.press('Shift+ArrowLeft');
+    uiExpect((await panel.boundingBox()).x).toBeCloseTo(before.x - 40, 0);
+    await page.getByRole('button', { name: 'Close assistant' }).click();
+    await page.getByRole('button', { name: 'Open floating assistant' }).click();
+    await uiExpect(panel).toContainText('Sheet1!A2');
+    await page.screenshot({
+      path: 'artifacts/company-floating-assistant.png',
+      animations: 'disabled',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    const bounds = await panel.boundingBox();
+    uiExpect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+  },
+);

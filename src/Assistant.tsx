@@ -20,6 +20,8 @@ import {
   X,
 } from 'lucide-react';
 import { api, type Item } from './api';
+// @ts-expect-error Shared original MIT browser module.
+import { bindFloating, prepareImage } from '../public/studio/floating.js';
 const prompts: Record<string, string[]> = {
   doc: [
     'Create a clear outline for this document',
@@ -41,16 +43,23 @@ const prompts: Record<string, string[]> = {
 export function Assistant({
   doc,
   onClose,
+  open,
+  userId,
   onOpenDocument,
 }: {
   doc: Item | null;
+  open: boolean;
+  userId: string;
   onClose: () => void;
   onOpenDocument: (id: string) => void;
 }) {
   const [prompt, setPrompt] = useState(''),
     [messages, setMessages] = useState<Item[]>([]),
     [busy, setBusy] = useState(false),
-    [wide, setWide] = useState(false),
+    [agent, setAgent] = useState('coordinator'),
+    [catalog, setCatalog] = useState<Item>({ agents: [], tools: [] }),
+    [images, setImages] = useState<Item[]>([]),
+    [attachmentError, setAttachmentError] = useState(''),
     [mode, setMode] = useState('Ask'),
     [tone, setTone] = useState('Professional'),
     [language, setLanguage] = useState('English'),
@@ -59,7 +68,41 @@ export function Assistant({
     [copied, setCopied] = useState(-1),
     [service, setService] = useState<Item>({});
   const scroll = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLElement>(null),
+    handle = useRef<HTMLElement>(null),
+    resize = useRef<HTMLButtonElement>(null);
+  const controls = useRef<any>(null);
+  const upload = useRef<HTMLInputElement>(null),
+    camera = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    controls.current = bindFloating(
+      panel.current,
+      handle.current,
+      resize.current,
+      'reverse-ai-window-' + userId,
+    );
+    return () => controls.current?.destroy();
+  }, [userId]);
+  useEffect(() => {
+    if (open)
+      panel.current
+        ?.querySelector<HTMLTextAreaElement>('[aria-label="Message to assistant"]')
+        ?.focus();
+  }, [open]);
+  async function attach(files: File[]) {
+    setAttachmentError('');
+    try {
+      if (files.length + images.length > 3) throw Error('Attach at most three images.');
+      const prepared: Item[] = await Promise.all(files.map((file) => prepareImage(file)));
+      setImages((current) => [...current, ...prepared].slice(0, 3));
+    } catch (error) {
+      setAttachmentError((error as Error).message);
+    }
+  }
+  useEffect(() => {
+    api('/ai/agents')
+      .then(setCatalog)
+      .catch(() => {});
     api('/integrations')
       .then(setService)
       .catch(() => {});
@@ -70,19 +113,22 @@ export function Assistant({
   async function send(text = prompt) {
     if (!text.trim() || busy) return;
     setPrompt('');
-    setMessages((m) => [...m, { role: 'user', text }]);
+    setMessages((m) => [...m, { role: 'user', text, images }]);
     setBusy(true);
     try {
       const result = await api('/ai', 'POST', {
         prompt: text.slice(0, 8000),
         documentId: doc?.id,
         mode,
+        agent,
+        images,
         tone,
         language,
         selectedText: context,
         history: messages.slice(-8).map((m) => ({ role: m.role, text: m.text.slice(0, 16000) })),
       });
       setMessages((m) => [...m, { role: 'assistant', ...result }]);
+      setImages([]);
     } catch (e) {
       setMessages((m) => [...m, { role: 'assistant', text: (e as Error).message, error: true }]);
     } finally {
@@ -101,10 +147,34 @@ export function Assistant({
   const suggestions = prompts[doc?.kind ?? 'workspace'] ?? prompts.workspace;
   return (
     <aside
-      className={`assistant-panel assistant-studio ${wide ? 'wide' : ''}`}
+      ref={panel}
+      hidden={!open}
+      className="assistant-panel assistant-studio floating-assistant"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('Files')) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        attach(Array.from(e.dataTransfer.files));
+      }}
+      onPaste={(e) => {
+        const files = Array.from(e.clipboardData.files);
+        if (files.length) {
+          e.preventDefault();
+          attach(files);
+        }
+      }}
       aria-label="AI assistant"
     >
-      <header>
+      <header
+        ref={handle}
+        tabIndex={0}
+        aria-label="Move assistant. Use arrow keys; Home resets position."
+        className="assistant-drag-handle"
+      >
         <div className="assistant-logo">
           <Sparkles size={20} />
         </div>
@@ -127,10 +197,10 @@ export function Assistant({
         </button>
         <button
           className="icon-button"
-          aria-label={wide ? 'Narrow assistant' : 'Expand assistant'}
-          onClick={() => setWide(!wide)}
+          aria-label="Expand assistant"
+          onClick={() => controls.current?.reset()}
         >
-          {wide ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+          <Maximize2 size={17} />
         </button>
         <button className="icon-button" onClick={onClose} aria-label="Close assistant">
           <X size={18} />
@@ -160,6 +230,26 @@ export function Assistant({
           <small>This context is included with your next messages.</small>
         </div>
       )}
+      <div className="agent-selector">
+        <label>
+          Agent{' '}
+          <select aria-label="AI agent" value={agent} onChange={(e) => setAgent(e.target.value)}>
+            {(catalog.agents || []).map((a: Item) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <details>
+          <summary>{catalog.tools?.length || 0} tools</summary>
+          {catalog.tools?.map((t: Item) => (
+            <p key={t.name}>
+              <strong>{t.name}</strong> · {t.description}
+            </p>
+          ))}
+        </details>
+      </div>
       <div className="assistant-modes">
         {[
           ['Ask', Sparkles],
@@ -226,6 +316,27 @@ export function Assistant({
               )}
               <strong>{m.role === 'user' ? 'You' : m.provider || 'Assistant'}</strong>
             </div>
+            {m.images?.length > 0 && (
+              <div className="ai-attachments">
+                {m.images.map((image: Item, j: number) => (
+                  <img key={j} src={image.data} alt={image.name} />
+                ))}
+              </div>
+            )}
+            {m.trace?.length > 0 && (
+              <details className="ai-tool-trace" open>
+                <summary>
+                  {m.trace.length} tool steps · {m.agent}
+                </summary>
+                {m.trace.map((step: Item, j: number) => (
+                  <div key={j}>
+                    <span>{step.status === 'complete' ? '✓' : '!'}</span>{' '}
+                    <strong>{step.tool}</strong>
+                    <small>{step.summary}</small>
+                  </div>
+                ))}
+              </details>
+            )}
             <div className="ai-markdown">
               <Markdown remarkPlugins={[remarkGfm]}>{m.text}</Markdown>
             </div>
@@ -235,9 +346,10 @@ export function Assistant({
                   {m.sources.length} workspace reference{m.sources.length > 1 ? 's' : ''}
                 </summary>
                 {m.sources.map((s: Item) => (
-                  <button key={s.id} onClick={() => onOpenDocument(s.id)}>
+                  <button key={s.id + (s.location || '')} onClick={() => onOpenDocument(s.id)}>
                     <FileText size={12} />
                     {s.title}
+                    {s.location ? ' · ' + s.location : ''}
                     <ArrowUpRight size={12} />
                   </button>
                 ))}
@@ -267,6 +379,54 @@ export function Assistant({
           send();
         }}
       >
+        <div className="ai-attachments">
+          {images.map((image, index) => (
+            <div key={index}>
+              <img src={image.data} alt={image.name} />
+              <button
+                type="button"
+                aria-label={'Remove image ' + (index + 1)}
+                onClick={() => setImages(images.filter((_, i) => i !== index))}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        {attachmentError && <p role="alert">{attachmentError}</p>}
+        <input
+          ref={upload}
+          type="file"
+          hidden
+          multiple
+          accept="image/png,image/jpeg,image/webp"
+          aria-label="Attach images"
+          onChange={(e) => {
+            attach(Array.from(e.target.files || []));
+            e.target.value = '';
+          }}
+        />
+        <input
+          ref={camera}
+          type="file"
+          hidden
+          accept="image/*"
+          capture="environment"
+          aria-label="Take photo"
+          onChange={(e) => {
+            attach(Array.from(e.target.files || []));
+            e.target.value = '';
+          }}
+        />
+        <div className="attachment-actions">
+          <button type="button" onClick={() => upload.current?.click()}>
+            ＋ Image
+          </button>
+          <button type="button" onClick={() => camera.current?.click()}>
+            Camera
+          </button>
+          <small>Drop or paste · up to 3</small>
+        </div>
         <div className="ai-compose-options">
           <select
             aria-label="AI response tone"
@@ -312,6 +472,15 @@ export function Assistant({
       <p className="assistant-disclaimer">
         AI drafts need your review. Shift + Enter for a new line.
       </p>
+      <button
+        type="button"
+        ref={resize}
+        className="assistant-resize"
+        aria-label="Resize assistant. Use arrow keys."
+        title="Drag to resize"
+      >
+        ◢
+      </button>
     </aside>
   );
 }
