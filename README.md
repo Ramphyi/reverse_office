@@ -1,5 +1,7 @@
 # Reverse Office
 
+**Release status: blocked by the requested MIT/Apache-2.0-only license policy.** The current ONLYOFFICE, Node runtime, Debian image and several application dependencies do not meet that policy. The instructions below describe the previous, non-compliant implementation. Docker builds and the deployment script now stop at the license gate. No compliant replacement release has been completed. See [license status and migration blockers](docs/LICENSE-STATUS.md).
+
 A self-hosted company workspace with a consistent modern UI: writing, spreadsheets, presentations, files, PDF signing, chat, meetings, projects, timesheets, leave, company knowledge, mail and an accessible AI sidebar.
 
 **This is an independent, functional foundation, not a complete reimplementation of Microsoft 365, Adobe Acrobat, Jira or SharePoint.** It uses public formats and original application code. No proprietary binaries were supplied or decompiled. See the exact capability boundaries below before adopting it for production.

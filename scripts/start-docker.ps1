@@ -1,5 +1,7 @@
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path -Parent $PSScriptRoot)
+& node scripts/license-audit.mjs --check
+if ($LASTEXITCODE) { throw 'Deployment blocked by the strict MIT/Apache-2.0 license policy. See docs/LICENSE-STATUS.md.' }
 if (-not (Test-Path '.env')) { Copy-Item -LiteralPath '.env.example' -Destination '.env' }
 $taskEnv = [IO.File]::ReadAllText((Join-Path (Get-Location) '.env'))
 foreach ($keyName in @('SETUP_KEY', 'OFFICE_JWT_SECRET')) {

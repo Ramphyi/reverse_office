@@ -1,6 +1,19 @@
 name: Workspace checks
 on: [push, pull_request]
 jobs:
+  license-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - run: node scripts/license-audit.mjs --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: license-audit
+          path: artifacts/license-audit.json
   test:
     runs-on: ubuntu-latest
     steps:
