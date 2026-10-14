@@ -75,6 +75,8 @@ The Vite build currently emits a large-bundle advisory for the combined editor b
 
 ## Romania branch
 
+Independent workspace upgrade, 2026-10-14: **92/92 backend tests and 10/10 company/Romania browser scenarios** pass after the production build. Salary privacy, remembered sessions, native-copy preservation, PDF copies, rich pages, Nova tools and the existing invoice/UBL/payment flow are included. A timing-sensitive chat assertion was corrected to inspect the delivered article separately and wait for the composer to clear. ANAF calls remain simulated; no live submission or full-company Docker rebuild was performed.
+
 Workforce upgrade, 2026-10-14: **40/40 backend tests, 4/4 workspace/Romania browser flows and 3/3 native Office browser flows** passed on `feature/romania-spv`. The base release image passed isolated non-root/read-only container checks for organisation updates, account creation, mandatory password replacement, weekly time entries, shared calendar totals and actual native spreadsheet-to-PDF conversion. Billing/ANAF remains isolated to this branch; no real ANAF submission was made.
 
 Office Studio upgrade, 2026-10-14: the Romania branch passed the production build, **34/34 backend tests, 3/3 workspace/Romania browser flows and 2/2 native Office browser flows** against the actual Document Server. These include the native editing, export, image insertion and two-account collaboration checks described above. ANAF remains simulated. The base image also passed a fresh hardened-container setup and actual native spreadsheet-to-PDF conversion through Document Server.
