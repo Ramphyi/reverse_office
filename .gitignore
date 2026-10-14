@@ -13,4 +13,6 @@ work/**/tool-index*
 *.p12
 *.pfx
 *.pem
+studio-server/assets.h
+studio-server/manifest.json
 deploy/private-*

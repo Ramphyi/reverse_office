@@ -1,0 +1,21 @@
+# Build tools are not part of the final distributed container.
+FROM gcc:14-bookworm@sha256:5e927c284bf55a7dc796262e311a0703344f62f41f5621eb56843111b1d37e15 AS build
+WORKDIR /build
+COPY public/studio ./public/studio
+COPY studio-server/server.c studio-server/embed.py ./studio-server/
+RUN python3 studio-server/embed.py \
+ && gcc -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-ident -nostdlib -static -no-pie -Wl,--build-id=none -Wl,-z,noexecstack -o /studio studio-server/server.c \
+ && test -z "$(nm -u /studio)" \
+ && ! readelf -l /studio | grep -q INTERP \
+ && ! readelf -d /studio | grep -q NEEDED
+
+FROM scratch
+LABEL org.opencontainers.image.title="Reverse Studio" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.description="Independent local document editors. Original static server and browser assets only."
+COPY --from=build /studio /studio
+COPY --from=build /build/studio-server/manifest.json /manifest.json
+COPY public/studio/LICENSE /LICENSE
+USER 65532:65532
+EXPOSE 8080
+ENTRYPOINT ["/studio"]

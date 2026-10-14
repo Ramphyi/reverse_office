@@ -9,7 +9,9 @@ import {
   Table2,
   X,
 } from 'lucide-react';
-import { api, type Item } from './api';
+import { save, type Item } from './api';
+// @ts-expect-error The standalone MIT editor is shared without a runtime package dependency.
+import { newDocument } from '../public/studio/core.js';
 import { Modal } from './components';
 export function TemplateGallery({
   kind,
@@ -29,14 +31,76 @@ export function TemplateGallery({
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   useEffect(() => {
-    api('/office/templates')
-      .then(setTemplates)
-      .catch((e) => setError(e.message));
+    setTemplates([
+      {
+        id: 'doc-blank',
+        kind: 'doc',
+        name: 'Blank document',
+        description: 'A clean page for your next idea.',
+        tags: ['Writer', 'DOCX'],
+        accent: '#386a56',
+        template: 'blank',
+      },
+      {
+        id: 'doc-report',
+        kind: 'doc',
+        name: 'Project report',
+        description: 'Summary, progress table and next steps.',
+        tags: ['Report', 'Tables'],
+        accent: '#386a56',
+        template: 'report',
+      },
+      {
+        id: 'doc-letter',
+        kind: 'doc',
+        name: 'Business letter',
+        description: 'A simple, editable business letter.',
+        tags: ['Letter', 'DOCX'],
+        accent: '#386a56',
+        template: 'letter',
+      },
+      {
+        id: 'sheet-blank',
+        kind: 'sheet',
+        name: 'Blank workbook',
+        description: 'Cells, formulas, styles and charts.',
+        tags: ['Sheets', 'XLSX'],
+        accent: '#788641',
+        template: 'blank',
+      },
+      {
+        id: 'sheet-budget',
+        kind: 'sheet',
+        name: 'Project budget',
+        description: 'Plan against actuals with a live comparison chart.',
+        tags: ['Budget', 'Formulas'],
+        accent: '#788641',
+        template: 'budget',
+      },
+      {
+        id: 'slides-blank',
+        kind: 'slides',
+        name: 'Blank presentation',
+        description: 'Start your story with a title slide.',
+        tags: ['Slides', 'PPTX'],
+        accent: '#b27843',
+        template: 'blank',
+      },
+      {
+        id: 'slides-pitch',
+        kind: 'slides',
+        name: 'Project pitch',
+        description: 'An idea, the opportunity, and your plan.',
+        tags: ['Pitch', 'Themes'],
+        accent: '#b27843',
+        template: 'pitch',
+      },
+    ]);
   }, []);
   return (
     <Modal
       title="Start with something good."
-      description="Native Office templates. Every page, cell and object is yours to edit."
+      description="Independent Reverse Studio editors. Create, edit and export your work."
       wide
       onClose={onClose}
     >
@@ -113,11 +177,9 @@ export function TemplateGallery({
             setBusy(true);
             setError('');
             try {
-              const d = await api('/office/create', 'POST', {
-                templateId: chosen.id,
-                title,
-                projectId,
-              });
+              const content = newDocument(kind, chosen.template);
+              content.title = title;
+              const d = await save('documents', { title, projectId, kind, content });
               await onCreate(d);
               onClose();
             } catch (e) {

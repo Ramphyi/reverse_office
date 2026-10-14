@@ -1,6 +1,8 @@
 # Strict license status — 2026-10-14
 
-**Current application and deployed images: NOT COMPLIANT. Replacement migration: NOT COMPLETE.**
+**Full company application and previous company images: NOT COMPLIANT. Whole-suite migration: NOT COMPLETE.**
+
+**New separate artifact: Reverse Studio.** Original MIT Writer/Sheets/Slides editors are now implemented with a freestanding original server in a `scratch` container. The final image excludes npm, Node, ONLYOFFICE and OS packages. Its isolated scope, inventory and limitations are documented in [STUDIO.md](STUDIO.md). Run `node scripts/studio-audit.mjs` for its source allowlist check. This does not lift the full company application's release block or approve its existing runtime/dependency graph.
 
 The owner explicitly requires MIT or Apache-2.0 for every distributed component, including container OS packages and runtime dependencies. This is an exact allowlist, not a general “permissive licensing” requirement. BSD, ISC, MIT-0, OFL, public-domain, GPL/LGPL/AGPL and other licenses are not silently treated as allowed. Where a package offers an actual MIT **OR** GPL choice, selecting MIT can satisfy the declaration check; MIT **AND** Zlib cannot.
 
@@ -8,15 +10,15 @@ The repository's original Reverse Office code is now explicitly MIT-licensed in 
 
 ## Confirmed blockers
 
-| Component | Evidence | Consequence |
-|---|---|---|
-| ONLYOFFICE Document Server 10.0.0 | AGPL notices and [upstream repository](https://github.com/ONLYOFFICE/DocumentServer) | Replace the whole editor service; another wrapper or fork does not change its license. |
-| Node.js 22.18.0 runtime | Installed `/usr/local/LICENSE` and [versioned upstream notices](https://github.com/nodejs/node/blob/v22.18.0/LICENSE) | Node's own MIT license does not cover every embedded dependency. BSD/ISC and other notices remain. |
-| GNU libc in the Debian-based image | Installed `/usr/share/doc/libc6/copyright` identifies LGPL-2.1-or-later, with additional component notices | The current image cannot qualify. Merely using `scratch` while copying the existing Node binary would not fix bundled runtime licenses. |
-| Debian shell and other OS packages | Installed `/usr/share/doc/dash/copyright` includes BSD-3-Clause and file-specific notices | Need an artifact without these packages, followed by a complete binary/asset inventory. |
-| Bundled fonts | `@fontsource-variable/dm-sans` and `@fontsource-variable/manrope`: OFL-1.1 | Replace or stop distributing these assets. |
-| Icons | `lucide-react`: ISC | Replace with independently created icons or a verified allowed set. |
-| Transitive npm dependencies | `package-lock.json`; repeatable audit below | Multiple ISC, BSD, MIT-0, Zlib, BlueOak, Unlicense and unknown declarations require replacement or evidence review. A direct dependency's MIT label does not approve its dependency tree. |
+| Component                          | Evidence                                                                                                              | Consequence                                                                                                                                                                               |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ONLYOFFICE Document Server 10.0.0  | AGPL notices and [upstream repository](https://github.com/ONLYOFFICE/DocumentServer)                                  | Replace the whole editor service; another wrapper or fork does not change its license.                                                                                                    |
+| Node.js 22.18.0 runtime            | Installed `/usr/local/LICENSE` and [versioned upstream notices](https://github.com/nodejs/node/blob/v22.18.0/LICENSE) | Node's own MIT license does not cover every embedded dependency. BSD/ISC and other notices remain.                                                                                        |
+| GNU libc in the Debian-based image | Installed `/usr/share/doc/libc6/copyright` identifies LGPL-2.1-or-later, with additional component notices            | The current image cannot qualify. Merely using `scratch` while copying the existing Node binary would not fix bundled runtime licenses.                                                   |
+| Debian shell and other OS packages | Installed `/usr/share/doc/dash/copyright` includes BSD-3-Clause and file-specific notices                             | Need an artifact without these packages, followed by a complete binary/asset inventory.                                                                                                   |
+| Bundled fonts                      | `@fontsource-variable/dm-sans` and `@fontsource-variable/manrope`: OFL-1.1                                            | Replace or stop distributing these assets.                                                                                                                                                |
+| Icons                              | `lucide-react`: ISC                                                                                                   | Replace with independently created icons or a verified allowed set.                                                                                                                       |
+| Transitive npm dependencies        | `package-lock.json`; repeatable audit below                                                                           | Multiple ISC, BSD, MIT-0, Zlib, BlueOak, Unlicense and unknown declarations require replacement or evidence review. A direct dependency's MIT label does not approve its dependency tree. |
 
 Unspecified package declarations are **unresolved**, not automatically a finding that their code has a forbidden license. For example, the installed `busboy`, `streamsearch` and `xmlhttprequest-ssl` LICENSE files contain MIT-style grants despite absent lockfile license fields. These remain fail-closed until exact-version/file evidence is recorded. No third-party license text or package metadata has been edited to manufacture compliance.
 

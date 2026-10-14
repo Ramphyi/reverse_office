@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reverse-studio
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: reverse-studio }
+  template:
+    metadata:
+      labels: { app: reverse-studio }
+    spec:
+      nodeSelector: { kubernetes.io/arch: amd64 }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: studio
+          image: reverse-office:studio
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8080 }]
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 50m, memory: 16Mi }
+            limits: { cpu: '1', memory: 96Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reverse-studio
+spec:
+  selector: { app: reverse-studio }
+  ports: [{ port: 8080, targetPort: 8080 }]
+  type: ClusterIP

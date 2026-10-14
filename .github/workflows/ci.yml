@@ -1,6 +1,30 @@
 name: Workspace checks
 on: [push, pull_request]
 jobs:
+  studio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - run: node scripts/studio-audit.mjs
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: docker compose -p reverse-studio -f compose.studio.yaml up -d --build
+      - run: npm run test:studio
+        env:
+          STUDIO_URL: http://127.0.0.1:3002
+      - run: node scripts/test-studio-container.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-verification
+          path: |
+            artifacts/studio-license-audit.json
+            artifacts/studio-browser-report
+            artifacts/studio-container-checks.json
   license-policy:
     runs-on: ubuntu-latest
     steps:
